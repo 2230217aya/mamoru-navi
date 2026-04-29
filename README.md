@@ -71,29 +71,23 @@ Native/Expo）、データベース（PostgreSQL/PostGIS）の3つの開発環�
     psql -U user -d mamoru_navi_db
     プロンプトが mamoru_navi_db=# になれば接続成功です。\q で終了します。
 
-4.3 フロントエンド (React Native / Expo) の準備と起動（初回のみ）
+4.3 フロントエンド (React Native / Expo) の起動
 
-フロントエンドコンテナは、初回起動時にReact Nativeプロジェクトの初期化が必要です。
+1. Dockerコンテナを起動する
+   docker-compose up -d
 
-1.  フロントエンドコンテナに入る
+2. 依存ライブラリをインストールする（Unable to find expoエラーが出る場合）
+   docker-compose exec frontend npm install
 
-    docker-compose exec frontend bash
+3. 開発サーバーを起動する
+   Docker/WSL環境では、ネットワーク制限を回避するために --tunnel オプションを推奨します。
 
-2.  React Nativeプロジェクトの初期化
-    - コンテナ内で以下のコマンドを実行します。対話形式でプロジェクト名などを聞かれますが、blank (TypeScript)
-      を選択し、プロジェクト名も . (ドット)
-      で現在のディレクトリに作成するように指定してください。
+   docker-compose exec frontend npx expo start --tunnel
 
-    expo init .
-    - 初期化が完了したら、Ctrl+D または exit と入力してコンテナから抜けます。
+   初回実行時に @expo/ngrok のインストールを求められたら y を入力してください。
+   ターミナルに表示された QRコード をスマホの「Expo Go」アプリで読み込むと、実機でプレビュー可能です。
 
-3.  フロントエンドの開発サーバー起動 プロジェクトのルートディレクトリ（mamoru-navi/）で、以下のコマンドを実行します。
-
-    docker-compose exec frontend npx expo start --host 0.0.0.0
-    - これにより、Expo開発サーバーが起動し、ターミナルにQRコードが表示されます。
-    - お手持ちのスマートフォンに「Expo Go」アプリをインストールし、このQRコードを読み込むと、スマホでアプリがプレビューできます。
-
-4.  開発の進め方
+4. 開発の進め方
 
 - ソースコードの編集: VSCodeなどのエディタで、backend/app や frontend
   フォルダ内のファイルを直接編集します。volumes設定により、変更はリアルタイムでコンテナに同期されます。
