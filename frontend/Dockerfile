@@ -2,8 +2,8 @@ FROM node:18
 
 WORKDIR /app
 
-# React Native(Expo)の開発に必要なツールをインストール
-# プロジェクト作成時にnpm installが行われるため、ここでは実行しない
+# プロジェクト作成後のため、npm install は不要
+# ただし、expo-cliと@expo/ngrokはグローバルに入れておく
 RUN npm install -g expo-cli @expo/ngrok
 
 EXPOSE 19000 19001 19002 8081
