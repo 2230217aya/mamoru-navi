@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  # 1. バックエンドサービス
+  backend:
+    build:
+      context: ./backend # ./backend/Dockerfile を使ってビルド
+    ports:
+      - "8000:8000" # PCの8000番ポートをコンテナの8000番に接続
+    volumes:
+      - ./backend/app:/app # PCのソースコードをコンテナに同期（コード変更が即反映）
+    depends_on:
+      - db # dbサービスが起動してから起動する
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/mamoru_navi_db
+
+  # 2. フロントエンドサービス
+  frontend:
+    build:
+      context: ./frontend # ./frontend/Dockerfile を使ってビルド
+    ports:
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+    volumes:
+      - ./frontend:/app # PCのソースコードをコンテナに同期
+      - /app/node_modules # node_modulesはコンテナ内のものを使う（重要）
+    stdin_open: true # コンテナ内でコマンドを実行し続けるために必要
+    tty: true
+
+  # 3. データベースサービス
+  db:
+    image: postgis/postgis:15-3.4 # PostGIS拡張機能が入ったPostgreSQLイメージ
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=mamoru_navi_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+
+volumes:
+  postgres_data:

@@ -1,0 +1,17 @@
+# --- 共通 ---
+.env
+.DS_Store
+
+# --- Python (Backend) ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# --- React Native / Node.js (Frontend) ---
+node_modules/
+.expo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
