@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.database import engine
+from app.models.base import Base
+from app.router import base
+
 app = FastAPI()
+
+Base.metadata.create_all(bind=engine) 
+
+app.include_router(base.router)
 
 class LocationRequest(BaseModel):
     user_id: str

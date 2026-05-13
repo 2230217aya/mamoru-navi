@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000" # PCの8000番ポートをコンテナの8000番に接続
     volumes:
-      - ./backend/app:/app # PCのソースコードをコンテナに同期（コード変更が即反映）
+      - ./backend:/app # PCのソースコードをコンテナに同期（コード変更が即反映）
     depends_on:
       - db # dbサービスが起動してから起動する
     environment:
