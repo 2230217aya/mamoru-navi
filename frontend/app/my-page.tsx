@@ -2,7 +2,7 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
 // ★ src/screens から MyPageScreen を直接インポート ★
-import MyPageScreenComponent from '../../src/screens/MyPageScreen'; 
+import MyPageScreenComponent from '../src/screens/MyPageScreen'; 
 
 // MyPageScreenComponent をラップして export する関数
 export default function MyPageScreen() { // export する関数名はファイル名と同じにするのが一般的

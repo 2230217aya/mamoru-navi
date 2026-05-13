@@ -7,40 +7,38 @@ import { useRouter } from 'expo-router'; // 画面遷移用のフック
 // このファイルが、タブの「ホーム」として機能します。
 
 export default function HomeScreen() {
-  const router = useRouter(); // 画面遷移を管理するオブジェクト
-
+  const router = useRouter();
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>まもるナビ仮ホームページ</Text>
       <Text style={styles.subtitle}>ようこそ！</Text>
 
-      {/* マイページへのボタン */}
       <TouchableOpacity 
         style={styles.button}
-        onPress={() => router.push('../my-page')} // ★ app/my-page.tsx へ遷移 ★
+        // ★ app/my-page.tsx が存在するので、このパスでOK ★
+        onPress={() => router.push('./my-page')} 
       >
         <Text style={styles.buttonText}>マイページへ</Text>
       </TouchableOpacity>
 
-      {/* オフラインデータ管理へ遷移 */}
       <TouchableOpacity 
         style={styles.button}
-        onPress={() => router.push('../offline-data')} // ★ app/offline-data.tsx へ遷移 ★
+        // ★ app/offline-data.tsx が存在するので、このパスでOK ★
+        onPress={() => router.push('./offline-data')} 
       >
         <Text style={styles.buttonText}>オフラインデータ管理</Text>
       </TouchableOpacity>
 
-       {/* ダッシュボードへ遷移 */}
-      {/* <TouchableOpacity 
+       <TouchableOpacity 
         style={styles.button}
-        onPress={() => router.push('../dashboard')} // app/dashboard.tsx へ遷移
+        onPress={() => router.push('./dashbord')} 
       >
         <Text style={styles.buttonText}>ダッシュボード</Text>
-      </TouchableOpacity> */}
+      </TouchableOpacity>
       
       <Text style={styles.footerText}>災害時も安心の備えを。</Text>
     </SafeAreaView>
-  );
+  )
 }
 
 const styles = StyleSheet.create({

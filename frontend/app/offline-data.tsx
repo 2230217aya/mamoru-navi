@@ -1,6 +1,6 @@
 // frontend/app/offline-data.tsx
 import React from 'react';
-import OfflineDataScreen from '../../src/screens/OfflineDataScreen';
+import OfflineDataScreen from '../src/screens/OfflineDataScreen';
 import { useRouter } from 'expo-router';
 
 export default function OfflineDataScreenWrapped() { // 関数名を分けることで、元のコンポーネントと区別
