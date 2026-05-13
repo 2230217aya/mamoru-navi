@@ -179,6 +179,14 @@ Type: feat, fix, docs, style, refactor, test, chore など。
 Subject: 変更内容の簡潔な要約（命令形が望ましい）。
 Body: 変更の背景や詳細な説明（必須ではない）。
 
+(例)
+git add .
+
+git commit -m "feat: QRコード表示機能を実装
+
+Why: ユーザーが自身のQRコードを確認できるようにするため
+How: MyPageScreenコンポーネントにQRCodeライブラリを組み込み、ダミーデータを表示
+"
 
 [新しいファイル作成時の具体的な手順例]
 例1：新しい「設定」画面をタブに追加したい場合
