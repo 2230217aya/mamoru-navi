@@ -1,0 +1,118 @@
+[33mcommit fae07249b67558ec8e61a3c34d57a58427f9df2e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed May 13 12:23:28 2026 +0900
+
+    refactor: Organize files and setup routing structure. Fix linting errors.
+
+[33mcommit 224d45eddefab71210a15205fdeca1086c0f6fd4[m
+Merge: 85bff7e 5d515e4
+Author: 2230217aya <166676088+2230217aya@users.noreply.github.com>
+Date:   Wed May 13 11:25:54 2026 +0900
+
+    Merge pull request #4 from 2230217aya/feature/tomo18058-save-location
+    
+    位置情報をDBに保存する処理を追加
+
+[33mcommit 5d515e45a379bc05b78759e8bb533ab392f3b917[m
+Author: tomo18058 <tomontomon1203@icloud.com>
+Date:   Mon May 11 16:47:15 2026 +0900
+
+    位置情報をDBに保存する処理を追加
+
+[33mcommit 85bff7e97623fbb0e94e86a70684acfb59ffa7cc[m
+Merge: e33d530 40ab448
+Author: 2230217aya <166676088+2230217aya@users.noreply.github.com>
+Date:   Mon May 11 15:48:36 2026 +0900
+
+    Merge pull request #3 from 2230217aya/feature/tomo18058-location-api
+    
+    現在地受信APIを作成
+
+[33mcommit e33d5304f770d0c8fa6677ee0af0c9b441aa14bd[m
+Merge: 171556f ddc4887
+Author: SoutaAraki <159858710+SotaAraki@users.noreply.github.com>
+Date:   Mon May 11 15:40:25 2026 +0900
+
+    Merge pull request #2 from 2230217aya/feat/staff-front
+    
+    indexファイル修正
+
+[33mcommit 40ab448fd3dbe463e7fa1f9d4f0488b8f11f9e45[m
+Author: tomo18058 <tomontomon1203@icloud.com>
+Date:   Mon May 11 15:36:39 2026 +0900
+
+    現在地受信APIを作成
+
+[33mcommit ddc48877a934a5efaa4d4a725990839d832fe6dc[m
+Merge: 730a17e 171556f
+Author: Araki Sota <sht31256@icloud.com>
+Date:   Mon May 11 15:29:54 2026 +0900
+
+    Merge branch 'main' into feat/staff-front
+
+[33mcommit 730a17ea7c63437d1423c930c00a069bce6091a4[m
+Author: Araki Sota <sht31256@icloud.com>
+Date:   Mon May 11 15:29:42 2026 +0900
+
+    [disable]indexファイルの修正
+    
+    起動時にindex.tsxが開かれる仕様だったため、indexから作成中のファイルに遷移する処理を追加したのを間違えてプッシュしてしまったため、その修正
+
+[33mcommit 171556f24c455300341cb79ac2efb34c6d24ebc0[m
+Merge: a1ef276 e6c0382
+Author: 2230217aya <166676088+2230217aya@users.noreply.github.com>
+Date:   Mon May 11 15:24:02 2026 +0900
+
+    Merge pull request #1 from 2230217aya/feat/staff-front
+    
+    [add]ダッシュボード画面作成
+
+[33mcommit e6c03826908380a41348da35b129d5055d40bca8[m
+Author: Araki Sota <sht31256@icloud.com>
+Date:   Mon May 11 15:22:28 2026 +0900
+
+    [add]ダッシュボード画面作成
+    
+    作成途中です
+
+[33mcommit a1ef276cd30dc13cb6d4b6d64dad09170d6bd739[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed Apr 29 14:43:39 2026 +0900
+
+    execができるようにした
+
+[33mcommit 8365b085070ee0a3c58cc61c71aedf45b83b6560[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed Apr 29 13:42:15 2026 +0900
+
+    feat: frontendプロジェクトの初期化完了
+
+[33mcommit 387f068e7972a8d0301ed92516926bca41b2ba8c[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed Apr 29 13:11:39 2026 +0900
+
+    fix: docker-compose frontend volumes 順序修正 (node_modules除外)
+
+[33mcommit f09363fe6bfcd6ba0418db530c1b2ccc3c6ceb36[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed Apr 29 12:19:28 2026 +0900
+
+    feat: frontend (React Native) プロジェクトを初期化
+
+[33mcommit d6cd4ae0285db93097958a38c696e0614595da1a[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed Apr 29 11:41:28 2026 +0900
+
+    READMEの中でDockerの使い方やgitの使い方を書いた
+
+[33mcommit f14d1cb0668e8c4d0af48cd3356117f240b5623c[m
+Author: 2230217aya <2230217ecc@gmail.com>
+Date:   Wed Apr 29 11:13:25 2026 +0900
+
+    初期環境構築
+
+[33mcommit b2070a272bc9b92ead14809dd7b37054109e5755[m
+Author: 2230217aya <166676088+2230217aya@users.noreply.github.com>
+Date:   Wed Apr 29 10:37:10 2026 +0900
+
+    Initial commit
