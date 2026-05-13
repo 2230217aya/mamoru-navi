@@ -4,7 +4,7 @@
     "strict": true,
     "paths": {
       "@/*": [
-        "./*" // app/からのエイリアス解決のために、baseUrlが "./" であることが前提
+        "./*"
       ]
     }
   },
@@ -12,18 +12,6 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    // ★★★ Expo Router のルーティングを正しく認識させるための修正 ★★★
-    // app/ フォルダ直下にある .tsx ファイルをすべて含める
-    "app/*.tsx",
-    // app/(tabs)/ フォルダ以下の全ての .tsx ファイルを含める
-    "app/(tabs)/**/*.tsx",
-    // app/my-page.tsx, app/profile-edit.tsx など、(tabs) 外のファイルも明示的に含める
-    "app/my-page.tsx",
-    "app/profile-edit.tsx",
-    "app/dashboard.tsx", // もし dashboard.tsx が app/ 直下にある場合
-    "app/dash-bord.tsx", // ★ ファイル名に合わせて .tsx を追加 ★
-    "src/**/*.tsx" // src フォルダ内のファイルも必要に応じて含める
-  ],
-  "exclude": ["node_modules", "babel.config.js", "metro.config.js", "*.ts"]
+    "expo-env.d.ts"
+  ]
 }
