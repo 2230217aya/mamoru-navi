@@ -10,8 +10,11 @@ import {
 // QRコードを生成するライブラリ
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaFrameContext } from "react-native-safe-area-context";
+import { useRouter } from 'expo-router'; 
 
 export default function MyPageScreen({ navigator }: any) {
+  const router = useRouter(); // router を取得
+
   // QRコードを表示するかどうかの状態管理（初期値は true = 表示）
   const [isQrVisible, setIsQrVisible] = useState(true);
 
@@ -53,7 +56,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* 個人情報の確認・編集ボタン（黄色） */}
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => navigator.navigate("ProfileConfim")} // ※後で作る確認画面への遷移名
+        onPress={() => router.push('../profile-edit')} // ※後で作る確認画面への遷移名
       >
         <Text style={styles.primaryButtonText}>個人情報の確認・編集</Text>
       </TouchableOpacity>
@@ -64,7 +67,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* ホームへ戻るボタン（グレー） */}
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => navigator.navigate("Home")} // ※後で作るホーム画面への遷移名
+        onPress={() => router.push('/')} // ※後で作るホーム画面への遷移名
       >
         <Text style={styles.secondaryButtonText}>ホームへ戻る</Text>
       </TouchableOpacity>

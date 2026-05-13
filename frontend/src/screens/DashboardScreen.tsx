@@ -1,6 +1,7 @@
 import { StyleSheet, Pressable, View, Text, Image } from "react-native";
 import { Link } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
+// ★themed-textをインポートする場所は「app」フォルダの直下なので、このように修正 ★
+import TextComponent from '../components/themed-text';
 
 export default function dashboard() {
   return (
