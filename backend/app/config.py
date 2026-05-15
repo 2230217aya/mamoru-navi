@@ -1,0 +1,5 @@
+#位置情報の更新間隔(秒)
+LOCATION_UPDATE_INTERVAL_SECONDS = 30
+
+#古い位置情報として扱うまでの時間(分)
+OLD_LOCATION_STALE_MINUTES = 5
