@@ -15,10 +15,48 @@ import { useState } from 'react';
 
 export default function UserHome() {
   const [mode, setMode] = useState('normal');
+{/* クイック検索アイテム 仮データ*/}
+  const quickSearchItems = [
+  {
+    id: 1,
+    title: '市区役所',
+  },
+  {
+    id: 2,
+    title: '図書館',
+  },
+  {
+    id: 3,
+    title: '体育館',
+  },
+];
+ {/* 平常時施設情報表示 仮データ*/}
+ const officeServices = [
+    {
+      id: 1,
+      title: '証明書の発行',
+      number: '22',
+    },
+    {
+      id: 2,
+      title: '住所の変更・印鑑登録',
+      number: '57',
+    },
+    {
+      id: 3,
+      title: 'マイナンバー',
+      number: '132',
+    },
+    {
+      id: 4,
+      title: '戸籍の提出・相談',
+      number: '12',
+    },
+  ];
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Map */}
+      {/* Map 仮データ*/}
       <MapView
         style={styles.map}
         initialRegion={{
@@ -51,6 +89,7 @@ export default function UserHome() {
           description="開設中"
         />
 
+
       )}
       </MapView>
 
@@ -79,33 +118,33 @@ export default function UserHome() {
         </View>
 
         {/* MyPage */}
-        {/* <TouchableOpacity 
+        <TouchableOpacity 
         style={styles.iconButton}
         onPress={() => router.push('/user_profile')}>
           <Image
           source={require('../assets/images/userpage.png')}
           style={{ width: 32, height: 32 }}
         />
-        </TouchableOpacity> */}
-
-      </View>
-{/*Quick Search*/}
-      <View style={styles.quickSearchContainer}>
-        <TouchableOpacity
-          style={styles.quickSearchButton}
-          
-        >
-          <Text style={styles.quickSearchText}>市区役所</Text>
-          
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickSearchButton}>
-    <Text style={styles.quickSearchText}>図書館</Text>
-  </TouchableOpacity>
-  <TouchableOpacity style={styles.quickSearchButton}>
-    <Text style={styles.quickSearchText}>体育館</Text>
-  </TouchableOpacity>
-      </View>
 
+      </View>
+        {/*クイック検索アイテム*/}
+            <View style={styles.quickSearchContainer}>
+
+        {quickSearchItems.map((item) => (
+
+            <TouchableOpacity
+            key={item.id}
+            style={styles.quickSearchButton}
+            >
+            <Text style={styles.quickSearchText}>
+                {item.title}
+            </Text>
+            </TouchableOpacity>
+
+        ))}
+
+        </View>
         {/* モード切替
         // 開発環境のみ表示　start */}
       <View style={styles.modeContainer}>
@@ -165,48 +204,37 @@ export default function UserHome() {
           : '○○避難所'}
 
       </Text>
-              {mode == 'normal' && (
-      <View style={styles.statsContainer}>
-
-        <View style={styles.usuallystatBox}>
-          <Text style={styles.usuallyTitle}>証明書の発行</Text>
-          </View>
-          </View>
-      )}
-
-      {mode !== 'normal' && (
-      <View style={styles.statsContainer}>
-
-        <View style={styles.statBox}>
-          <Text style={styles.statTitle}>移動中</Text>
-
-          <Text style={styles.statValue}>6人</Text>
-
-          <Image
-            source={require('../assets/images/arukuhito.png')}
-            style={styles.statImage}
-          />
-        </View>
-
-          <View style={styles.statBox2}>
-          <Text style={styles.statTitle}>収容される</Text>
-
-          <Text style={styles.statValue}>15人</Text>
-
-          <Image
-            source={require('../assets/images/hinan.png')}
-            style={styles.statImage}
-          />
-        </View>
-
-      </View>
-      )}
-      </View>
       
-      {/* 下の情報欄 end*/}
-    </SafeAreaView>
-  );
-}
+      {/* 平常時施設情報表示 */}
+  {mode === 'normal' ? (
+    <View style={styles.usuallystatBox}>
+      {officeServices.map((item) => (
+        <View key={item.id} style={styles.rowItem}>
+          <Text style={styles.usuallyTitle}>{item.title}</Text>
+          <Text style={styles.numberText}>{item.number}番</Text>
+        </View>
+      ))}
+    </View>
+        ) : (
+            <View style={styles.statsContainer}>
+            <View style={styles.statBox}>
+                <Text style={styles.statTitle}>移動中</Text>
+                <Text style={styles.statValue}>6人</Text>
+            </View>
+
+            <View style={styles.statBox2}>
+                <Text style={styles.statTitle}>収容される</Text>
+                <Text style={styles.statValue}>15人</Text>
+            </View>
+            </View>
+        )}
+        </View>  {/* 下の情報欄 end*/}
+        </SafeAreaView>
+      
+    );
+  };
+     
+    
 
 const styles = StyleSheet.create({
   container: {
@@ -218,7 +246,7 @@ const styles = StyleSheet.create({
     height: '100%',
     position: 'absolute',
   },
-
+// ヘッダー
   header: {
    position: 'absolute',
     top: 0,
@@ -235,25 +263,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-
+//ヘッダーのicon
   iconButton: {
     width: 48,
     height: 48,
-
-    // borderRadius: 24,
-
-    // backgroundColor: '#ffffff',
-
     justifyContent: 'center',
     alignItems: 'center',
-
-  
   },
-
+//検索欄
   searchContainer: {
     flex: 1,
 
     flexDirection: 'row',
+
     alignItems: 'center',
 
     backgroundColor: '#ffffff',
@@ -276,33 +298,56 @@ const styles = StyleSheet.create({
 
     elevation: 4,
   },
-
+//検索icon
   searchIcon: {
     marginRight: 8,
   },
-
+//検索
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: '#333',
   },
+  // クイック検索アイテム
+    quickSearchContainer: {
+        position: 'absolute',
+
+    top: 85,
+    left: 10,
+    right: 20,
+    flexDirection: 'row',
+    padding: 6,
+
+    },
+
+    quickSearchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    marginRight: 6,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    },
+
+    quickSearchText: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: 'bold',
+    },
 
 //下の情報欄
   bottomCard: {
     position: 'absolute',
-
     bottom: 0,
     left: 0,
     right: 0,
-
     backgroundColor: '#ffffff',
-
     borderRadius: 20,
-
     padding: 20,
-
+    paddingBottom: 24,
     shadowColor: '#000',
-
     shadowOffset: {
       width: 0,
       height: 2,
@@ -310,52 +355,22 @@ const styles = StyleSheet.create({
 
     shadowOpacity: 0.15,
     shadowRadius: 4,
-
     elevation: 5,
   },
 
-
-  quickSearchContainer: {
-    position: 'absolute',
-
-  top: 85,
-  left: 10,
-  right: 20,
-  flexDirection: 'row',
-  padding: 6,
-
-  },
-
-quickSearchButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 4,
-  paddingHorizontal: 20,
-  paddingVertical: 8,
-  marginRight: 6,
-  backgroundColor: '#ffffff',
-  borderRadius: 16,
-},
-
-quickSearchText: {
-  color: '#666',
-  fontSize: 12,
-  fontWeight: 'bold',
-},
-
-
+  //施設タイトル
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
 
     marginBottom: 8,
   },
-
+  //施設説明
   cardText: {
     fontSize: 15,
     color: '#555',
-
     lineHeight: 22,
+    paddingBottom: 10,
   },
 
 statsContainer: {
@@ -363,15 +378,32 @@ statsContainer: {
   gap: 12,
   marginTop: 10,
 },
+rowItem: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+},
 usuallystatBox: {
   flex: 1,
-  backgroundColor: '#bbbbbb',
+  backgroundColor: '#eeeeee',
   padding: 12,
   borderRadius: 12,
-  alignItems: 'center',
+  
+  
 },
 usuallyTitle: {
-    
+  flex: 1,              
+  fontWeight: 'bold',
+  fontSize: 14,
+  color: '#000000',
+},
+
+numberText: {
+  fontSize: 14,
+  fontWeight: 'bold',
+  color: '#1976d2',
+  alignSelf: 'flex-end',
 },
 statBox: {
    flex: 1,
