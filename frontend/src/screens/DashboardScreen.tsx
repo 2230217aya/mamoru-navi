@@ -1,48 +1,65 @@
 import { StyleSheet, Pressable, View, Text, Image } from "react-native";
-import { Link } from 'expo-router';
-// ★themed-textをインポートする場所は「app」フォルダの直下なので、このように修正 ★
-import TextComponent from '../components/themed-text';
+import { Stack, router  } from 'expo-router';
+import { ThemedText } from '@/components/themed-text';
+import DashboardButton from '../components/dashboard_component';
 
 export default function dashboard() {
   return (
-    <View style={styles.container}>
-      {/* ひとつのボタン */}
-      <Link href="/" asChild>
-        <Pressable style={styles.qrcode}>
-          {/* ボタンの画像イメージ */}
+    // ヘッダーと本機能で2つあるとreturnで返せなくてエラーが出るのでひとまとめに
+    <>
+
+      {/* ヘッダー消すやつ */}
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <View style={styles.container}>
+        {/* 右上のアイコン */}
+        <Pressable onPress={() => router.push("/")} style={styles.userIconButton}>
           <Image
-            source={require('@/assets/images/dashboard-qrcode.png')}
-            style={styles.image}
+            source={require('@/assets/images/dashboard-userIcon.png')}
+            style={styles.userIcon}
           />
-          {/* ボタンのテキスト */}
-          <Text style={styles.qrcodeText}>QRコード受付</Text>
         </Pressable>
-      </Link>
 
-      {/* ボタンを横並びに */}
-      <View style={styles.rowButtons}>
-        <Link href="/" asChild>
-          <Pressable style={styles.photo}>
-            <Image
-              source={require('@/assets/images/dashboard-photo.png')}
-              style={styles.image}
-            />
-            <Text style={styles.buttonText}>身分証明書{'\n'}撮る</Text>
-          </Pressable>
-        </Link>
+        {/* QRコード受付 */}
+        <DashboardButton
+          title="QRコード受付"
+          img={require('@/assets/images/dashboard-qrcode.png')}
+          href="/"
+          backgroundColor="#FFF693"
+          textColor="#000000"
+          width="90%"
+          imgsize={170}
+        />
 
-        <Link href="/" asChild>
-          <Pressable style={styles.input}>
-            <Image
-              source={require('@/assets/images/dashboard-input.png')}
-              style={styles.image}
-            />
-            <Text style={styles.buttonText}>手入力</Text>
-          </Pressable>
-        </Link>
+        {/* ボタンを横並びに */}
+        <View style={styles.rowButtons}>
+          <DashboardButton
+            title={"身分証明書\n撮る"}
+            img={require('@/assets/images/dashboard-photo.png')}
+            href="/"
+            backgroundColor="#9D9D9D"
+            textColor="#FFF693"
+            width="40%"
+            imgsize={120}
+          />
+
+          <DashboardButton
+            title="手入力"
+            img={require('@/assets/images/dashboard-input.png')}
+            href="/"
+            backgroundColor="#9D9D9D"
+            textColor="#FFF693"
+            width="40%"
+            imgsize={120}
+          />
+        </View>
+
       </View>
-
-    </View>
+    </>
   );
 }
 
@@ -55,70 +72,23 @@ const styles = StyleSheet.create({
     gap: 20,                  // ボタン間隔
   },
 
-  // QRコードのボタン
-  qrcode: {
-    width: '90%', // 横幅
-    height: 275,  // 縦幅
-
-    backgroundColor: '#FFF693', // 背景色
-
-    // 中身の要素を中央寄せする効果もある
-    justifyContent: 'flex-end', // 文字を下に置く
-    alignItems: 'center',
-
-    borderRadius: 12, // 角丸
-    padding: 20,  // マージン
-  },
-
-  // QRボタンのテキスト
-  qrcodeText: {
-    color: '#000000',
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-
-  // 写真のボタン
-  photo: {
-    width: '40%',
-    height: 250,
-
-    backgroundColor: '#9D9D9D',
-
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-
-    borderRadius: 12,
-    padding: 20,
-  },
-
-  // 手入力のボタン
-  input: {
-    width: '40%',
-    height: 250,
-
-    backgroundColor: '#9D9D9D',
-
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-
-    borderRadius: 12,
-    padding: 20,
-  },
-
-  // 写真、手入力のテキスト
-  buttonText: {
-    color: '#FFF693',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',  // 身分証明書 撮る が改行なので二行目を中央寄せするのに必要
-  },
-
   // 写真と手入力のボタンがが入ってるview（横並びにする為に入れてる）
   rowButtons: {
     flexDirection: 'row', // 横並び
     gap: 20,
   },
 
-  image: {},
-  
+  // ユーザーアイコンが入っているPressable
+  userIconButton: {
+    position: 'absolute',
+    top: 50,
+    right: 10,
+    zIndex: 10,
+  },
+
+  // ユーザーアイコン
+  userIcon: {
+    width: 50,
+    height: 50,
+  },  
 });
