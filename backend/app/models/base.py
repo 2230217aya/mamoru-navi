@@ -63,3 +63,15 @@ class Notification(Base):
     read_at = Column(TIMESTAMP, nullable=True)
     action_url = Column(Text, nullable=True)
 
+class Reservation(Base):
+    __tablename__ = "facility_reservations"
+
+    reservation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True)
+    facility_id = Column(UUID(as_uuid=True), ForeignKey("shelters.shelter_id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    start_time = Column(TIMESTAMP, nullable=False)
+    end_time = Column(TIMESTAMP, nullable=False)
+    status = Column(String(20), nullable=False, server_default="pending")
+    purpose = Column(Text, nullable=True)
+    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
+
