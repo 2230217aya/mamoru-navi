@@ -56,7 +56,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* 個人情報の確認・編集ボタン（黄色） */}
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => router.push('../profile-edit')} // ※後で作る確認画面への遷移名
+        onPress={() => router.push('../profile-confirm')} // ※後で作る確認画面への遷移名
       >
         <Text style={styles.primaryButtonText}>個人情報の確認・編集</Text>
       </TouchableOpacity>
