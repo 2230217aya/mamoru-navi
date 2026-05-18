@@ -29,6 +29,7 @@ export default function RootLayout() { // 関数名も RootLayout に変更
       */}
       <Stack.Screen name="index"  options={{ title: 'ホーム' }} />
       <Stack.Screen name="my-page" options={{ title: 'マイQR' }} />
+      <Stack.Screen name="profile-confirm" options={{ title: '個人情報確認' }} />
       <Stack.Screen name="profile-edit"  options={{ title: '個人情報編集' }} />
       <Stack.Screen name="offline-data"  options={{ title: 'データ管理' }} />
       <Stack.Screen name="dashbord"options={{ title: 'ダッシュボード' }} />
