@@ -97,7 +97,8 @@ export default function UserHome({ navigation }: any) {
       <View style={styles.header}>
 
         {/* Menu */}
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton}
+        onPress={() => router.push('../offline-data')}>
           <Ionicons name="menu" size={28} color="#333" />
         </TouchableOpacity>
 

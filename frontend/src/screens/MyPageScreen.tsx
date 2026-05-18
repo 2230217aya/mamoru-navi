@@ -67,7 +67,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* ホームへ戻るボタン（グレー） */}
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => router.push('/')} // ※後で作るホーム画面への遷移名
+        onPress={() => router.back()}// ※後で作るホーム画面への遷移名
       >
         <Text style={styles.secondaryButtonText}>ホームへ戻る</Text>
       </TouchableOpacity>
