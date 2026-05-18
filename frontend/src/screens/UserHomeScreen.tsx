@@ -15,7 +15,7 @@ import { useState } from 'react';
 
 export default function UserHome({ navigation }: any) {
   const [mode, setMode] = useState('normal');
-{/* クイック検索アイテム 仮データ*/}
+//  クイック検索アイテム 仮データ*
   const quickSearchItems = [
   {
     id: 1,
@@ -30,7 +30,7 @@ export default function UserHome({ navigation }: any) {
     title: '体育館',
   },
 ];
- {/* 平常時施設情報表示 仮データ*/}
+// 平常時施設情報表示 仮データ
  const officeServices = [
     {
       id: 1,
@@ -240,8 +240,9 @@ export default function UserHome({ navigation }: any) {
             />
           </View>
             </View>
-        )}
-        </View>  {/* 下の情報欄 end*/}
+        )}{/* 下の情報欄 end */}
+        </View>  
+        
         </SafeAreaView>
       
     );
