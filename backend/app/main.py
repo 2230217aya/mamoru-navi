@@ -70,3 +70,20 @@ def delete_old_locations():
             "deleted_count": deleted_count,
             "stale_minutes": OLD_LOCATION_STALE_MINUTES
     }
+
+@app.get("/shelters")
+def get_shelters():
+    # データベースに接続する
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # sheltersテーブルから避難所情報を取得する
+    cur.execute("SELECT id, name, latitude, longitude, radius_m, created_at FROM shelters;")
+    shelters = cur.fetchall()
+
+    # カーソルとDB接続を閉じる
+    cur.close()
+    conn.close()
+
+    # 取得した避難所情報をレスポンスとして返す
+    return {"shelters": [{"id": shelter[0], "name": shelter[1], "latitude": shelter[2], "longitude": shelter[3], "radius_m": shelter[4], "created_at": shelter[5]} for shelter in shelters]}
