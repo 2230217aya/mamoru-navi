@@ -1,5 +1,5 @@
 import { navigate } from "expo-router/build/global-state/routing";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Text,
   View,
@@ -10,7 +10,8 @@ import {
 // QRコードを生成するライブラリ
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaFrameContext } from "react-native-safe-area-context";
-import { useRouter } from 'expo-router'; 
+import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 
 export default function MyPageScreen({ navigator }: any) {
   const router = useRouter(); // router を取得
@@ -18,8 +19,40 @@ export default function MyPageScreen({ navigator }: any) {
   // QRコードを表示するかどうかの状態管理（初期値は true = 表示）
   const [isQrVisible, setIsQrVisible] = useState(true);
 
-  // QRコードに埋め込むデータ（バックエンドと繋ぐまでは仮のIDにしておく）
-  const qrData = "DummyUserId_123456789";
+  // QRコードに埋め込むデータ（バックエンドから取得する）
+  const [qrData, setQrData] = useState<string>("Loading...");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchQrCode = async () => {
+      try {
+        // Expo Goが接続しているPCのIPアドレスを自動取得する仕組み
+        const debuggerHost = Constants.expoConfig?.hostUri;
+        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost"; // ← チームメンバーがPCのエミュレータ等で動かした時に「おま環」にならないよう、localhostに戻しました。
+        // 【チーム開発対応】
+        // ハードコードされたURLをそのままGitに上げると他のメンバーがエラーになってしまうため、
+        // .envファイル（Gitには上がらない秘密のファイル）からURLを読み込むように変更しました。
+        // もし.envが設定されていなければ、デフォルトでパソコンのlocalhost（192.168.0.20等）を見に行きます。
+        const baseUrl =
+          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+        const apiUrl = `${baseUrl}/user/qr-code`;
+
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+          throw new Error("ネットワークエラーが発生しました");
+        }
+
+        const data = await response.json();
+        setQrData(data.qr_code_content); // バックエンドから受け取った文字列をセット
+      } catch (err) {
+        console.error("QRコード取得エラー:", err);
+        setError("QRコードを取得できませんでした");
+      }
+    };
+
+    fetchQrCode();
+  }, []);
 
   return (
     // SafeAreaViewは、iPhoneのノッチ（画面上の切り欠き）にUIが被らないようにするコンポーネント
@@ -30,11 +63,19 @@ export default function MyPageScreen({ navigator }: any) {
       {/* QRコード表示エリア */}
       <View style={styles.qrContainer}>
         {isQrVisible ? (
-          <QRCode
-            value={qrData}
-            size={220} // QRコードの大きさ
-            backgroundColor="transparent" // 背景色を透明に
-          />
+          <View style={styles.qrWrapper}>
+            {error ? (
+              <Text style={{ color: "red", textAlign: "center" }}>{error}</Text>
+            ) : qrData === "Loading..." ? (
+              <Text>読み込み中...</Text>
+            ) : (
+              <QRCode
+                value={qrData}
+                size={220} // QRコードの大きさ
+                backgroundColor="transparent" // 背景色を透明に
+              />
+            )}
+          </View>
         ) : (
           // 「隠す」を押した時に表示されるグレーのモザイク代わりのブロック
           <View style={styles.hiddenQrBox}>
@@ -56,7 +97,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* 個人情報の確認・編集ボタン（黄色） */}
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => router.push('../profile-confirm')} // ※後で作る確認画面への遷移名
+        onPress={() => router.push("../profile-confirm")} // ※後で作る確認画面への遷移名
       >
         <Text style={styles.primaryButtonText}>個人情報の確認・編集</Text>
       </TouchableOpacity>
@@ -67,7 +108,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* ホームへ戻るボタン（グレー） */}
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => router.push('/')} // ※後で作るホーム画面への遷移名
+        onPress={() => router.push("/")} // ※後で作るホーム画面への遷移名
       >
         <Text style={styles.secondaryButtonText}>ホームへ戻る</Text>
       </TouchableOpacity>
