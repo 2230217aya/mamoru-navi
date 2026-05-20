@@ -11,12 +11,23 @@ import {
   Text,
   Image,
 } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-export default function UserHome({ navigation }: any) {
-  const [mode, setMode] = useState('normal');
-//  クイック検索アイテム 仮データ*
-  const quickSearchItems = [
+// モード
+const MODES = {
+  NORMAL: 'normal',
+  DISASTER: 'disaster',
+};
+
+// types
+type OfficeService = {
+  id: number;
+  title: string;
+  number: string;
+};
+
+// クイック検索アイテム 仮データ*
+const QUICK_SEARCH_ITEMS = [
   {
     id: 1,
     title: '市区役所',
@@ -31,75 +42,126 @@ export default function UserHome({ navigation }: any) {
   },
 ];
 // 平常時施設情報表示 仮データ
- const officeServices = [
-    {
-      id: 1,
-      title: '証明書の発行',
-      number: '22',
-    },
-    {
-      id: 2,
-      title: '住所の変更・印鑑登録',
-      number: '57',
-    },
-    {
-      id: 3,
-      title: 'マイナンバー',
-      number: '132',
-    },
-    {
-      id: 4,
-      title: '戸籍の提出・相談',
-      number: '12',
-    },
-  ];
+const MOCK_OFFICE_SERVICES: OfficeService[] = [
+  {
+    id: 1,
+    title: '証明書の発行',
+    number: '22',
+  },
+  {
+    id: 2,
+    title: '住所の変更・印鑑登録',
+    number: '57',
+  },
+  {
+    id: 3,
+    title: 'マイナンバー',
+    number: '132',
+  },
+  {
+    id: 4,
+    title: '戸籍の提出・相談',
+    number: '12',
+  },
+];
+
+export default function UserHome() {
+
+  // ===== state =====
+  const [mode, setMode] = useState(MODES.NORMAL);
+
+  const [officeServices, setOfficeServices] =
+    useState<OfficeService[]>([]);
+
+  const [loading, setLoading] = useState(false);
+
+  const [lastUpdate, setLastUpdate] = useState('');
+
+  const [facilityLocation, setFacilityLocation] =
+    useState({
+      latitude: 34.6937,
+      longitude: 135.5023,
+    });
+
+  // ===== API =====
+  const fetchOfficeServices = async () => {
+    try {
+      setLoading(true);
+
+      // ===== future API =====
+      // const response = await axios.get(...)
+
+      // 仮
+      const data = MOCK_OFFICE_SERVICES;
+
+      setOfficeServices(data);
+
+      setLastUpdate(
+        new Date().toLocaleTimeString('ja-JP', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  //初期化
+  useEffect(() => {
+    fetchOfficeServices();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Map 仮データ*/}
+      {/* Map */}
       <MapView
         style={styles.map}
         initialRegion={{
-          latitude: 34.6937,
-          longitude: 135.5023,
+          latitude: facilityLocation.latitude,
+          longitude: facilityLocation.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
       >
-        {mode === 'normal' ? (
 
-        <Marker
-          coordinate={{
-            latitude: 34.6937,
-            longitude: 135.5023,
-          }}
-          title="大阪市役所"
-          description="公共施設"
-        />
+        {mode === MODES.NORMAL ? (
+          <Marker
+            coordinate={facilityLocation}
+            title="大阪市役所"
+            description="公共施設"
+          />
+        ) : (
+          <Marker
+            coordinate={{
+              latitude: 34.707500,
+              longitude: 135.504684,
+            }}
+            pinColor="red"
+            title="避難所"
+            description="開設中"
+          />
+        )}
 
-      ) : (
-
-        <Marker
-          coordinate={{
-            latitude: 34.707500,
-            longitude: 135.504684,
-          }}
-          pinColor="red"
-          title="避難所"
-          description="開設中"
-        />
-
-
-      )}
       </MapView>
 
       {/* Header */}
       <View style={styles.header}>
 
         {/* Menu */}
-        <TouchableOpacity style={styles.iconButton}
-        onPress={() => router.push('../offline-data')}>
-          <Ionicons name="menu" size={28} color="#333" />
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => router.push('../offline-data')}
+        >
+          <Ionicons
+            name="menu"
+            size={28}
+            color="#333"
+          />
         </TouchableOpacity>
 
         {/* Search */}
@@ -119,48 +181,56 @@ export default function UserHome({ navigation }: any) {
         </View>
 
         {/* MyPage */}
-        <TouchableOpacity 
-        style={styles.iconButton}
-        onPress={() => router.push('../my-page')}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => router.push('../my-page')}
+        >
           <Image
-          source={require('../../assets/images/userpage.png')}
-          style={{ width: 32, height: 32 }}
-        />
+            source={require('../../assets/images/userpage.png')}
+            style={{ width: 32, height: 32 }}
+          />
         </TouchableOpacity>
 
       </View>
-        {/*クイック検索アイテム*/}
-            <View style={styles.quickSearchContainer}>
 
-        {quickSearchItems.map((item) => (
+      {/*クイック検索アイテム*/}
+      <View style={styles.quickSearchContainer}>
 
-            <TouchableOpacity
+        {QUICK_SEARCH_ITEMS.map((item) => (
+
+          <TouchableOpacity
             key={item.id}
             style={styles.quickSearchButton}
-            >
+          >
             <Text style={styles.quickSearchText}>
-                {item.title}
+              {item.title}
             </Text>
-            </TouchableOpacity>
+          </TouchableOpacity>
 
         ))}
 
-        </View>
-        {/* モード切替
-        // 開発環境のみ表示　start */}
+      </View>
+
+      {/* モード切替 // 開発環境のみ表示　start */}
       <View style={styles.modeContainer}>
-      <Text style={styles.modeText}>開発環境のみ表示</Text>
+
+        <Text style={styles.modeText}>
+          開発環境のみ表示
+        </Text>
+
         <TouchableOpacity
           style={[
             styles.modeButton,
-            mode === 'normal' && styles.activeModeButton
+            mode === MODES.NORMAL &&
+              styles.activeModeButton
           ]}
-          onPress={() => setMode('normal')}
+          onPress={() => setMode(MODES.NORMAL)}
         >
           <Text
             style={[
               styles.modeText,
-              mode === 'normal' && styles.activeModeText
+              mode === MODES.NORMAL &&
+                styles.activeModeText
             ]}
           >
             平常
@@ -170,14 +240,16 @@ export default function UserHome({ navigation }: any) {
         <TouchableOpacity
           style={[
             styles.modeButton,
-            mode === 'disaster' && styles.activeModeButton
+            mode === MODES.DISASTER &&
+              styles.activeModeButton
           ]}
-          onPress={() => setMode('disaster')}
+          onPress={() => setMode(MODES.DISASTER)}
         >
           <Text
             style={[
               styles.modeText,
-              mode === 'disaster' && styles.activeModeText
+              mode === MODES.DISASTER &&
+                styles.activeModeText
             ]}
           >
             災害
@@ -185,69 +257,172 @@ export default function UserHome({ navigation }: any) {
         </TouchableOpacity>
 
       </View>
-      {/*  開発環境のみ表示　end*/}
-
+      {/* 開発環境のみ表示　end*/}
       {/* 下の情報欄 start*/}
       <View style={styles.bottomCard}>
-        <Text style={styles.cardTitle}>
 
-        {mode === 'normal'
-          ? '大阪市役所'
-          : '避難所状況'}
+        {/* Header */}
+        <View style={styles.cardHeader}>
 
-      </Text>
-      
+          <Text style={styles.cardTitle}>
+            {mode === MODES.NORMAL
+              ? '大阪市役所'
+              : '避難所状況'}
+          </Text>
 
-      <Text style={styles.cardText}>
+          {mode === MODES.NORMAL ? (
 
-        {mode === 'normal'
-          ? '営業時間: 9:00~17:00'
-          : '○○避難所'}
+            <TouchableOpacity
+              style={styles.reserveButton}
+              onPress={() => router.push('/')}
+            >
+              <Text style={styles.reserveButtonText}>
+                予約
+              </Text>
+            </TouchableOpacity>
 
-      </Text>
-      
-      {/* 平常時施設情報表示 */}
-  {mode === 'normal' ? (
-    <View style={styles.usuallystatBox}>
-      {officeServices.map((item) => (
-        
-        <View key={item.id} style={styles.rowItem}>
-          <Text style={styles.usuallyTitle}>{item.title}</Text>
-          <Text style={styles.numberText}>{item.number}番</Text>
+          ) : (
+
+            <TouchableOpacity
+              onPress={() => router.push('/')}
+            >
+              <Text style={styles.detailLink}>
+                詳しい情報 ＞
+              </Text>
+            </TouchableOpacity>
+
+          )}
+
         </View>
-      ))}
-    </View>
-        ) : (
-            <View style={styles.statsContainer}>
-            <View style={styles.statBox}>
-            <Text style={styles.statTitle}>移動中</Text>
 
-            <Text style={styles.statValueLeft}>6人</Text>
+        {/* Facility Info */}
+        {mode === MODES.NORMAL ? (
 
-            <Image
-              source={require('../../assets/images/arukuhito.png')}
-              style={styles.statImage}
-            />
-          </View>
+          <>
+            <View style={styles.infoRow}>
 
-            <View style={styles.statBox}>
-            <Text style={styles.statTitle}>収容される</Text>
+              <Text style={styles.cardText}>
+                営業時間: 9:00~17:00
+              </Text>
 
-            <Text style={styles.statValueLeft}>12人</Text>
+              <Text style={styles.closedText}>
+                定休日: 土日祝
+              </Text>
 
-            <Image
-              source={require('../../assets/images/hinan.png')}
-              style={styles.statImage}
-            />
-          </View>
             </View>
-        )}{/* 下の情報欄 end */}
-        </View>  
-        
-        </SafeAreaView>
-      
-    );
-  };
+
+            {/* Update */}
+            <View style={styles.updateRow}>
+
+              <Text style={styles.updateText}>
+                最終更新: {lastUpdate}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={fetchOfficeServices}
+              >
+                <Ionicons
+                  name="refresh"
+                  size={20}
+                  color="#373737"
+                />
+              </TouchableOpacity>
+
+            </View>
+
+          </>
+
+        ) : (
+
+          <Text style={styles.cardText}>
+            ○○避難所
+          </Text>
+
+        )}
+
+        {/* 平常時 */}
+        {mode === MODES.NORMAL ? (
+
+          <View style={styles.usuallystatBox}>
+
+            {loading ? (
+
+              <Text>
+                更新中...
+              </Text>
+
+            ) : (
+
+              officeServices.map((item) => (
+
+                <View
+                  key={item.id}
+                  style={styles.rowItem}
+                >
+                  <Text style={styles.usuallyTitle}>
+                    {item.title}
+                  </Text>
+
+                  <Text style={styles.numberText}>
+                    {item.number}番
+                  </Text>
+                </View>
+
+              ))
+
+            )}
+
+          </View>
+
+        ) : (
+          // 災害時
+          <View style={styles.statsContainer}>
+
+            <View style={styles.statBox}>
+
+              <Text style={styles.statTitle}>
+                移動中
+              </Text>
+
+              <Text style={styles.statValueLeft}>
+                6人
+              </Text>
+
+              <Image
+                source={require('../../assets/images/arukuhito.png')}
+                style={styles.statImage}
+              />
+
+            </View>
+
+            <View style={styles.statBox2}>
+
+              <Text style={styles.statTitle}>
+                収容される
+              </Text>
+
+              <Text style={styles.statValueLeft}>
+                12人
+              </Text>
+
+              <Image
+                source={require('../../assets/images/hinan.png')}
+                style={styles.statImage}
+              />
+
+            </View>
+
+          </View>
+
+        )}
+
+      </View>
+      {/* 下の情報欄 end */}
+
+    </SafeAreaView>
+  );
+}
      
     
 
@@ -387,6 +562,61 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingBottom: 10,
   },
+  cardHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+infoRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 4,
+},
+
+closedText: {
+  fontSize: 13,
+  color: '#666',
+},
+
+
+reserveButton: {
+  backgroundColor: '#FFEE37',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+  width: '30%',
+  alignItems: 'center',
+},
+
+reserveButtonText: {
+  color: '#000000',
+  fontSize: 14,
+  fontWeight: '600',
+},
+
+detailLink: {
+  color: '#007AFF',
+  fontSize: 14,
+  fontWeight: '500',
+},
+
+updateRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 6,
+},
+
+updateText: {
+  
+  fontSize: 12,
+  color: '#888',
+},
+refreshButton: {
+  padding: 4,
+},
+
 
 statsContainer: {
   flexDirection: 'row',
@@ -439,22 +669,21 @@ statBox2: {
 statValueLeft: {
   position: 'absolute',
   bottom: 10,
-  left: 15,
+  left: 13,
 
-  fontSize: 25,
+  fontSize: 30,
   fontWeight: 'bold',
-  color: '#1976d2',
+  color: '#000000',
 },
+//移動中・収容されるテキスト
 statTitle: {
   position: 'absolute',
   top: 10,
-  left: 0,
+  left: 10,
   right: 0,
-  textAlign: 'center',
-
   fontWeight: 'bold', 
 
-  fontSize: 22,
+  fontSize: 18,
   color: '#000000',
 },
 

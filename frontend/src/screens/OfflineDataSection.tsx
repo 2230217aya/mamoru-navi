@@ -31,15 +31,18 @@ export default function SafetyScreen() {
         <View style={styles.safetyContent}>
           
           <View style={styles.statusRow}>
-            <View style={styles.greenDot} />
+            <View style={styles.topStatusRow}>
+                <View style={styles.greenDot} />
 
-            <View>
-              <Text style={styles.safeText}>完璧です！</Text>
-              <Text style={styles.subText}>
-                通信が切れてもナビが使えます。
-              </Text>
+                <Text style={styles.safeText}>
+                完璧です！
+                </Text>
             </View>
-          </View>
+
+            <Text style={styles.subText}>
+                通信が切れてもナビが使えます。
+            </Text>
+            </View>
 
           <AnimatedCircularProgress
             size={120}
@@ -92,7 +95,7 @@ export default function SafetyScreen() {
 
         <TouchableOpacity style={styles.areaButton}>
           <Text style={styles.areaText}>
-            😊 実家周辺（半径3 km）
+            🏡 実家周辺（半径3 km）
           </Text>
         </TouchableOpacity>
       </View>
@@ -144,11 +147,27 @@ export default function SafetyScreen() {
             </Text>
           </View>
 
-          <Switch value={true} />
+          <Switch
+            value={true}
+            trackColor={{
+                false: '#ccc',
+                true: '#FFEE37',
+            }}
+            thumbColor={
+                true ? '#ffffff' : '#f4f3f4'
+            }
+            />
         </View>
 
         <Text style={styles.updateText}>
           Wi-Fi接続時に自動で最新データを更新する
+        </Text>
+        <Text style={styles.updateText2}>
+            ONにしておくと、アプリを開かなくても寝ている間に
+            
+        </Text>
+        <Text style={styles.updateText2}>
+            最新の避難所情報や地図が自動で準備されます。
         </Text>
       </View>
 </ScrollView>
@@ -177,7 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'red',
     borderRadius: 99,
     position: 'absolute',
-    top: 3,
+    top:40,
     right: -2,
   },
 
@@ -215,29 +234,34 @@ const styles = StyleSheet.create({
   },
 
   statusRow: {
+  flexDirection: 'column',
+    },
+
+    topStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
+    },
 
-  greenDot: {
+    greenDot: {
     width: 10,
     height: 10,
     borderRadius: 99,
     backgroundColor: '#27d83e',
-  },
+    },
 
-  safeText: {
+    safeText: {
     color: '#22cc33',
     fontSize: 30,
     fontWeight: 'bold',
-  },
+    },
 
-  subText: {
-    color: '#555',
+    subText: {
+    color: '#555',  
     fontSize: 10,
-    marginTop: 1,
-  },
+    marginTop: 2,
+    
+    },
 
   circle: {
     width: 120,
@@ -250,28 +274,29 @@ const styles = StyleSheet.create({
   },
 
   circleText: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#28c840',
   },
 
   downloadButton: {
     backgroundColor: '#ffe523',
-    marginTop: 18,
+    marginTop: 14,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 10,
     alignItems: 'center',
   },
 
   downloadText: {
     fontWeight: 'bold',
-    fontSize: 15,
+    fontSize: 12,
   },
 
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingBottom: 10,
   },
 
   addButton: {
@@ -289,14 +314,13 @@ const styles = StyleSheet.create({
 
   areaButton: {
     backgroundColor: '#f6ef9d',
-    padding: 14,
+    padding: 10,
     borderRadius: 10,
-    marginTop: 10,
+    marginTop: 5,
   },
 
   areaText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
   },
 
   smallTitle: {
@@ -349,4 +373,10 @@ const styles = StyleSheet.create({
     color: '#444',
     fontSize: 14,
   },
+  updateText2: {
+    color: '#8d8c8c',
+    fontSize: 10,
+    alignContent: 'center',
+  },
+  
 });
