@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from config import OLD_LOCATION_STALE_MINUTES
+from routers import users
 import psycopg2
 
 app = FastAPI()
+
+app.include_router(users.router)
 
 class LocationRequest(BaseModel):
     user_id: str
