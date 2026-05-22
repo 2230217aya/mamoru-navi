@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import {
   SafeAreaView,
   ScrollView ,
@@ -9,9 +10,45 @@ import {
   View,
   TouchableOpacity,
   Switch,
+  
 } from 'react-native';
 
 export default function SafetyScreen() {
+    const [safetyPercent, setSafetyPercent] =
+  useState(100);
+
+
+const getSafetyStatus = () => {
+
+  if (safetyPercent >= 70) {
+    return {
+      text: '完璧です！',
+      Chart: '安心',
+      color: '#28c840',
+      Contents: '通信が切れてもナビが使えます。',
+    };
+  }
+
+  if (safetyPercent >= 40) {
+    return {
+      text: '注意!',
+      Chart: '注意',
+      color: '#f5a623',
+      Contents: '最新のハザードマップが追加されました。今すぐダウンロードしてください。',
+    };
+  }
+
+  return {
+    text: '危険です',
+    Chart: '危険',
+    color: '#ff4d4f',
+    Contents: 'オフラインデータがありません。今すぐダウンロードしてください。',
+  };
+};
+
+
+const safetyStatus = getSafetyStatus();
+
   return (
       <ScrollView showsVerticalScrollIndicator={false}>
       
@@ -32,30 +69,63 @@ export default function SafetyScreen() {
           
           <View style={styles.statusRow}>
             <View style={styles.topStatusRow}>
-                <View style={styles.greenDot} />
+                <View
+                    style={[
+                        styles.greenDot,
+                        {
+                        backgroundColor: safetyStatus.color,
+                        },
+                    ]}
+                    />
 
-                <Text style={styles.safeText}>
-                完璧です！
-                </Text>
+                <Text
+                    style={[
+                        styles.safeText,
+                        {
+                        color: safetyStatus.color,
+                        },
+                    ]}
+                    >
+                    {safetyStatus.text}
+                    </Text>
             </View>
 
             <Text style={styles.subText}>
-                通信が切れてもナビが使えます。
+                {safetyStatus.Contents}
             </Text>
             </View>
 
           <AnimatedCircularProgress
             size={120}
             width={8}
-            fill={70}
-            tintColor="#28c840"
+            fill={safetyPercent}
+            tintColor={safetyStatus.color}
             backgroundColor="#d9d9d9"
             rotation={0}
             >
             {() => (
                 <View style={{ alignItems: 'center' }}>
-                <Text style={styles.circleText}>70%</Text>
-                <Text style={styles.circleText}>安心</Text>
+                <Text
+                    style={[
+                        styles.circleText,
+                        {
+                        color: safetyStatus.color,
+                        },
+                    ]}
+                    >
+                    {safetyPercent}%
+                    </Text>
+                <Text
+                    style={[
+                        styles.circleText,
+                        {
+                        fontSize: 16,
+                        color: safetyStatus.color,
+                        },
+                    ]}
+                    >
+                    {safetyStatus.Chart}
+                    </Text>
                 </View>
             )}
             </AnimatedCircularProgress>
@@ -74,7 +144,12 @@ export default function SafetyScreen() {
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>マイエリア設定</Text>
 
-          <TouchableOpacity style={styles.addButton}>
+           <TouchableOpacity
+            style={styles.addButton}
+            onPress={() =>
+              router.push('../add_area')
+            }
+          >
             <Text style={styles.addButtonText}>
               ＋ 新しいエリア
             </Text>
@@ -123,9 +198,14 @@ export default function SafetyScreen() {
           </View>
 
           <View style={styles.storageBox}>
-            <Ionicons name="server" size={40} color="#28c840" />
+            <Text style={styles.storageSub}>
+              このアプリが使用中の容量
+            </Text>
+                <View style={styles.storageboxs}>
+                    <Ionicons name="server" size={20} color="#28c840" />
 
-            <Text style={styles.storageText}>150MB</Text>
+                    <Text style={styles.storageText}>150MB</Text>
+                </View>
 
             <Text style={styles.storageSub}>
               この端末の空き容量: 20GB
@@ -203,10 +283,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    marginLeft: 10,
-    marginRight: 10,
+    padding: 15,
+    marginBottom: 8,
+    marginLeft: 5,
+    marginRight: 5,
 
     shadowColor: '#000',
     shadowOffset: {
@@ -221,20 +301,22 @@ const styles = StyleSheet.create({
   },
 
   cardTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#222',
   },
 
   safetyContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  
   },
 
   statusRow: {
   flexDirection: 'column',
+  width: 180,
+
     },
 
     topStatusRow: {
@@ -301,7 +383,7 @@ const styles = StyleSheet.create({
 
   addButton: {
     borderWidth: 1,
-    borderColor: '#e0cf39',
+    borderColor: '#fff3a6',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -313,7 +395,7 @@ const styles = StyleSheet.create({
   },
 
   areaButton: {
-    backgroundColor: '#f6ef9d',
+    backgroundColor: '#fff3a6',
     padding: 10,
     borderRadius: 10,
     marginTop: 5,
@@ -332,26 +414,31 @@ const styles = StyleSheet.create({
   dataRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 14,
+    marginTop: 5,
     alignItems: 'center',
   },
 
   dataText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#444',
     marginBottom: 8,
   },
 
   storageBox: {
     backgroundColor: '#fff3a6',
-    padding: 12,
+    paddingBottom: 10,
+    paddingTop: 10,
     borderRadius: 12,
     alignItems: 'center',
-    width: 120,
+    width: '50%',
   },
-
+    storageboxs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    },
   storageText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#2acb42',
   },
@@ -360,8 +447,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
     textAlign: 'center',
-    marginTop: 6,
+    margin: 6,
   },
+  
 
   grayText: {
     color: '#888',
