@@ -99,3 +99,23 @@ def get_shelters():
 
     # 取得した避難所情報をレスポンスとして返す
     return {"shelters": [{"id": str(shelter[0]), "name": shelter[1], "latitude": shelter[2], "longitude": shelter[3], "capacity": shelter[4], "status": shelter[5]} for shelter in shelters]}
+
+@app.get("/locations/{user_id}/latest")
+def get_latest_location(user_id: str):
+    # データベースに接続する
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # user_locationsテーブルから指定されたuser_idの最新の位置情報を取得する
+    cur.execute("SELECT id, user_id, ST_Y(location) AS latitude, ST_X(location) AS longitude, recorded_at FROM user_locations WHERE user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
+    location = cur.fetchone()
+
+    # カーソルとDB接続を閉じる
+    cur.close()
+    conn.close()
+
+    # 取得した位置情報をレスポンスとして返す
+    if location:
+        return {"id": str(location[0]), "user_id": str(location[1]), "latitude": location[2], "longitude": location[3], "recorded_at": location[4]}
+    else:
+        return {"message": "指定されたユーザーIDの位置情報が見つかりませんでした"}
