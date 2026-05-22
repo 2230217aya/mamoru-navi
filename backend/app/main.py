@@ -119,3 +119,41 @@ def get_latest_location(user_id: str):
         return {"id": str(location[0]), "user_id": str(location[1]), "latitude": location[2], "longitude": location[3], "recorded_at": location[4]}
     else:
         return {"message": "指定されたユーザーIDの位置情報が見つかりませんでした"}
+    
+@app.get("/locations/{user_id}/area")
+def get_location_area(user_id: str):
+    # データベースに接続する
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 指定ユーザーの最新位置情報と、最も近い避難所を取得する
+    # PostGISのST_Distanceで距離をメートル単位で計算する
+    # ST_DWithinで避難所から500m以内かどうかを判定する
+    cur.execute("SELECT " \
+                "ul.user_id, " \
+                "s.id AS shelter_id, " \
+                "s.name AS shelter_name, " \
+                "ST_Distance(ul.location, s.location) AS distance_m, " \
+                "ST_DWithin(ul.location, s.location, 500) AS in_area " \
+                "FROM user_locations ul " \
+                "JOIN shelters s ON ST_DWithin(ul.location, s.location, 500) " \
+                "WHERE ul.user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
+    area = cur.fetchone()
+
+    # カーソルとDB接続を閉じる
+    cur.close()
+    conn.close()
+
+    # 取得した位置情報をレスポンスとして返す
+    if area is None:
+        return {"message": "指定されたユーザーIDの位置情報が見つかりませんでした", "user_id": user_id}
+    
+    # エリア判定結果をレスポンスとして返す
+    return {
+        "user_id": str(area[0]),
+        "shelter_id": str(area[1]),
+        "shelter_name": area[2],
+        "distance_m": round(area[3], 2),
+        "area_radius_m": 500,
+        "in_area": area[4]
+    }
