@@ -27,8 +27,8 @@ def receive_location(location: LocationRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO user_locations (user_id, latitude, longitude) VALUES (%s, %s, %s) RETURNING id, user_id, latitude, longitude, created_at;",
-        (location.user_id, location.latitude, location.longitude)
+        "INSERT INTO user_locations (user_id, location) VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326)) RETURNING id, user_id, ST_Y(location) AS latitude, ST_X(location) AS longitude, recorded_at;",
+        (location.user_id, location.longitude, location.latitude)
     )
 
     saved_location = cur.fetchone()
@@ -37,11 +37,11 @@ def receive_location(location: LocationRequest):
     cur.close()
     conn.close()
     return {"message": "位置情報を受け取りました",
-                "id": saved_location[0],
-                "user_id": saved_location[1],
+                "id": str(saved_location[0]),
+                "user_id": str(saved_location[1]),
                 "latitude": saved_location[2],
                 "longitude": saved_location[3],
-                "created_at": saved_location[4]
+                "recorded_at": saved_location[4]
             }
 
 @app.delete("/locations/old")
@@ -51,9 +51,9 @@ def delete_old_locations():
     cur = conn.cursor()
 
     # 古い位置情報を削除する
-    # created_atが現在時刻 OLD_LOCATION_STALE_MINUTESより前のデータを対象にする
-    # 例：OLD_LOCATION_STALE_MINUTESが5の場合、created_atが現在時刻から5分以上前のデータを削除する
-    cur.execute("DELETE FROM user_locations WHERE created_at < NOW() - (%s * INTERVAL '1 minute');", (OLD_LOCATION_STALE_MINUTES,))
+    # recorded_atが現在時刻 OLD_LOCATION_STALE_MINUTESより前のデータを対象にする
+    # 例：OLD_LOCATION_STALE_MINUTESが5の場合、recorded_atが現在時刻から5分以上前のデータを削除する
+    cur.execute("DELETE FROM user_locations WHERE recorded_at < NOW() - (%s * INTERVAL '1 minute');", (OLD_LOCATION_STALE_MINUTES,))
     
     # 削除された行数を取得する
     deleted_count = cur.rowcount
@@ -78,7 +78,7 @@ def get_shelters():
     cur = conn.cursor()
 
     # sheltersテーブルから避難所情報を取得する
-    cur.execute("SELECT id, name, latitude, longitude, radius_m, created_at FROM shelters;")
+    cur.execute("SELECT id, name, ST_Y(location) AS latitude, ST_X(location) AS longitude, capacity, status FROM shelters ORDER BY name;")
     shelters = cur.fetchall()
 
     # カーソルとDB接続を閉じる
@@ -86,4 +86,4 @@ def get_shelters():
     conn.close()
 
     # 取得した避難所情報をレスポンスとして返す
-    return {"shelters": [{"id": shelter[0], "name": shelter[1], "latitude": shelter[2], "longitude": shelter[3], "radius_m": shelter[4], "created_at": shelter[5]} for shelter in shelters]}
+    return {"shelters": [{"id": str(shelter[0]), "name": shelter[1], "latitude": shelter[2], "longitude": shelter[3], "capacity": shelter[4], "status": shelter[5]} for shelter in shelters]}
