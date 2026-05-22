@@ -2,9 +2,18 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from config import OLD_LOCATION_STALE_MINUTES
 from routers import users
+from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 開発時はすべて許可
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, DELETE などすべて許可
+    allow_headers=["*"],  # すべてのヘッダー（Bypass-Tunnel-Reminderなど）を許可
+)
 
 app.include_router(users.router)
 

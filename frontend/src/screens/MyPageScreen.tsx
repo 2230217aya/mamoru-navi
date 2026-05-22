@@ -37,10 +37,22 @@ export default function MyPageScreen({ navigator }: any) {
           process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
         const apiUrl = `${baseUrl}/user/qr-code`;
 
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, {
+          method: "GET",
+          headers: {
+            "Bypass-Tunnel-Reminder": "true", // ★ これを追加
+            "Content-Type": "application/json",
+          },
+        });
+
+        // デバッグ用：ステータスコードを確認
+        console.log("Response Status:", response.status);
 
         if (!response.ok) {
-          throw new Error("ネットワークエラーが発生しました");
+          // エラーの詳細を知るためにメッセージを変更
+          const errorText = await response.text();
+          console.error("Error response:", errorText);
+          throw new Error(`エラー: ${response.status}`);
         }
 
         const data = await response.json();
