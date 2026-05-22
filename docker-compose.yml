@@ -33,6 +33,7 @@ services:
     image: postgis/postgis:15-3.4 # PostGIS拡張機能が入ったPostgreSQLイメージ
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+      - ./backend/sql:/docker-entrypoint-initdb.d # 初回起動時に自動でSQLを実行する
     ports:
       - "5432:5432"
     environment:
