@@ -1,5 +1,5 @@
-import { StyleSheet, Pressable, View, Text, Image, DimensionValue } from "react-native";
-import { Link, Href, useRouter  } from 'expo-router';
+import { StyleSheet, Pressable, Text, Image, DimensionValue } from "react-native";
+import { Href, useRouter  } from 'expo-router';
 
 type Props = {
   title: string;

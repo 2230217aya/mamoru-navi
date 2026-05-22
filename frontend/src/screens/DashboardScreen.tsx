@@ -1,13 +1,12 @@
-import { StyleSheet, Pressable, View, Text, Image } from "react-native";
-import { Stack, router  } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
+import { StyleSheet, Pressable, View, Image } from "react-native";
+import { router } from 'expo-router';
 import DashboardButton from '../components/dashboard-component';
 
 export default function dashboard() {
   return (
     <View style={styles.container}>
       {/* 右上のアイコン */}
-      <Pressable onPress={() => router.push("/")} style={styles.userIconButton}>
+      <Pressable onPress={() => router.push("/user-list")} style={styles.userIconButton}>
         <Image
           source={require('@/assets/images/dashboard-userIcon.png')}
           style={styles.userIcon}
