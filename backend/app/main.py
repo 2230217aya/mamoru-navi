@@ -133,10 +133,10 @@ def get_location_area(user_id: str):
                 "ul.user_id, " \
                 "s.id AS shelter_id, " \
                 "s.name AS shelter_name, " \
-                "ST_Distance(ul.location, s.location) AS distance_m, " \
-                "ST_DWithin(ul.location, s.location, 500) AS in_area " \
+                "ST_Distance(ul.location::geography, s.location::geography) AS distance_m, " \
+                "ST_DWithin(ul.location::geography, s.location::geography, 500) AS in_area " \
                 "FROM user_locations ul " \
-                "JOIN shelters s ON ST_DWithin(ul.location, s.location, 500) " \
+                "CROSS JOIN shelters s " \
                 "WHERE ul.user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
     area = cur.fetchone()
 
