@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+from typing import Optional
 import uuid
 
 # APIRouterのインスタンスを作成
@@ -50,3 +51,5 @@ async def get_user_qr_code():
         qr_code_content=qr_content_string,
         message="ユーザーIDに基づいたQRコードコンテンツを生成しました。"
     )
+
+
