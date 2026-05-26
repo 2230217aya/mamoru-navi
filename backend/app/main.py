@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from config import OLD_LOCATION_STALE_MINUTES
 from routers import users
+from routers import scan
+from database import get_db_connection
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
@@ -16,19 +18,14 @@ app.add_middleware(
 )
 
 app.include_router(users.router)
+app.include_router(scan.router)
 
 class LocationRequest(BaseModel):
     user_id: str
     latitude: float
     longitude: float
 
-def get_db_connection():
-    return psycopg2.connect(
-        host="db",
-        database="mamoru_navi_db",
-        user="user",
-        password="user"
-    )
+
 
 @app.get("/")
 def read_root():

@@ -33,8 +33,7 @@ export default function MyPageScreen({ navigator }: any) {
         // ハードコードされたURLをそのままGitに上げると他のメンバーがエラーになってしまうため、
         // .envファイル（Gitには上がらない秘密のファイル）からURLを読み込むように変更しました。
         // もし.envが設定されていなければ、デフォルトでパソコンのlocalhost（192.168.0.20等）を見に行きます。
-        const baseUrl =
-          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+        const baseUrl = `http://${localIp}:8000`;
         const apiUrl = `${baseUrl}/user/qr-code`;
 
         const response = await fetch(apiUrl, {
