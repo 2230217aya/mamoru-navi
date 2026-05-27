@@ -39,6 +39,7 @@ export default function RootLayout() {
       <Stack.Screen name="dashbord" options={{ title: "ダッシュボード" }} />
       <Stack.Screen name="scan-qr" options={{ title: "QRコードスキャン" }} />
       <Stack.Screen name="scan-result" options={{ title: "受付結果" }} />
+      <Stack.Screen name="id-scan" options={{ title: "身分証明書スキャン" }} />
     </Stack>
   );
 }
