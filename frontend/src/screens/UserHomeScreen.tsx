@@ -1,7 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import { router } from 'expo-router';
+import HomeBottomSheet from '../components/home/HomeBottomSheet';
+import 'react-native-reanimated';
 
+import {
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
 import {
   SafeAreaView,
   StyleSheet,
@@ -10,9 +15,12 @@ import {
   View,
   Text,
   Image,
+   Modal,
+  Animated,
 } from 'react-native';
 import { useEffect, useState } from 'react';
-
+import EmergencyAlertBanner
+  from '../components/home/EmergencyAlertBanner';
 // モード
 const MODES = {
   NORMAL: 'normal',
@@ -66,7 +74,7 @@ const MOCK_OFFICE_SERVICES: OfficeService[] = [
 ];
 
 export default function UserHome() {
-
+const [showDetail, setShowDetail] = useState(false);
   // ===== state =====
   const [mode, setMode] = useState(MODES.NORMAL);
 
@@ -116,6 +124,8 @@ export default function UserHome() {
   }, []);
 
   return (
+
+  <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaView style={styles.container}>
 
       {/* Map */}
@@ -193,24 +203,40 @@ export default function UserHome() {
 
       </View>
 
-      {/*クイック検索アイテム*/}
-      <View style={styles.quickSearchContainer}>
+      {/* ===== 平常 / 災害 切換區 ===== */}
+      {mode === MODES.NORMAL ? (
 
-        {QUICK_SEARCH_ITEMS.map((item) => (
+        // ===== 平常模式：Quick Search =====
+        <View style={styles.quickSearchContainer}>
 
-          <TouchableOpacity
-            key={item.id}
-            style={styles.quickSearchButton}
-          >
-            <Text style={styles.quickSearchText}>
-              {item.title}
-            </Text>
-          </TouchableOpacity>
+          {QUICK_SEARCH_ITEMS.map((item) => (
 
-        ))}
+            <TouchableOpacity
+              key={item.id}
+              style={styles.quickSearchButton}
+            >
+              <Text style={styles.quickSearchText}>
+                {item.title}
+              </Text>
+            </TouchableOpacity>
 
-      </View>
+          ))}
 
+        </View>
+
+      ) : (
+
+        // ===== 災害模式：警報 =====
+        <EmergencyAlertBanner
+
+          level="5"
+          title="緊急地震速報"
+          message="大阪府北部で地震発生"
+          levelText="震度5弱"
+
+        />
+
+      )}
       {/* モード切替 // 開発環境のみ表示　start */}
       <View style={styles.modeContainer}>
 
@@ -258,170 +284,64 @@ export default function UserHome() {
 
       </View>
       {/* 開発環境のみ表示　end*/}
+
+     
+
+
       {/* 下の情報欄 start*/}
-      <View style={styles.bottomCard}>
+      <HomeBottomSheet
+          mode={mode}
+          officeServices={officeServices}
+          loading={loading}
+          lastUpdate={lastUpdate}
+          onRefresh={fetchOfficeServices}
+        />
+              {/* 下の情報欄 end */}
+        <Modal
+          visible={showDetail}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
 
-        {/* Header */}
-        <View style={styles.cardHeader}>
+            <View style={styles.detailModal}>
 
-          <Text style={styles.cardTitle}>
-            {mode === MODES.NORMAL
-              ? '大阪市役所'
-              : '避難所状況'}
-          </Text>
+              <View style={styles.modalHandle} />
 
-          {mode === MODES.NORMAL ? (
-
-            <TouchableOpacity
-              style={styles.reserveButton}
-              onPress={() => router.push('/')}
-            >
-              <Text style={styles.reserveButtonText}>
-                予約
-              </Text>
-            </TouchableOpacity>
-
-          ) : (
-
-            <TouchableOpacity
-              onPress={() => router.push('/')}
-            >
-              <Text style={styles.detailLink}>
-                詳しい情報 ＞
-              </Text>
-            </TouchableOpacity>
-
-          )}
-
-        </View>
-
-        {/* Facility Info */}
-        {mode === MODES.NORMAL ? (
-
-          <>
-            <View style={styles.infoRow}>
-
-              <Text style={styles.cardText}>
-                営業時間: 9:00~17:00
+              <Text style={styles.modalTitle}>
+                避難所詳細情報
               </Text>
 
-              <Text style={styles.closedText}>
-                定休日: 土日祝
+              <Text style={styles.modalText}>
+                現在収容人数：12人
               </Text>
 
-            </View>
+              <Text style={styles.modalText}>
+                利用可能：毛布・水・食料
+              </Text>
 
-            {/* Update */}
-            <View style={styles.updateRow}>
-
-              <Text style={styles.updateText}>
-                最終更新: {lastUpdate}
+              <Text style={styles.modalText}>
+                ペット同行可能
               </Text>
 
               <TouchableOpacity
-                style={styles.refreshButton}
-                onPress={fetchOfficeServices}
+                style={styles.closeButton}
+                onPress={() => setShowDetail(false)}
               >
-                <Ionicons
-                  name="refresh"
-                  size={20}
-                  color="#373737"
-                />
+                <Text style={styles.closeButtonText}>
+                  閉じる
+                </Text>
               </TouchableOpacity>
 
             </View>
 
-          </>
-
-        ) : (
-
-          <Text style={styles.cardText}>
-            ○○避難所
-          </Text>
-
-        )}
-
-        {/* 平常時 */}
-        {mode === MODES.NORMAL ? (
-
-          <View style={styles.usuallystatBox}>
-
-            {loading ? (
-
-              <Text>
-                更新中...
-              </Text>
-
-            ) : (
-
-              officeServices.map((item) => (
-
-                <View
-                  key={item.id}
-                  style={styles.rowItem}
-                >
-                  <Text style={styles.usuallyTitle}>
-                    {item.title}
-                  </Text>
-
-                  <Text style={styles.numberText}>
-                    {item.number}番
-                  </Text>
-                </View>
-
-              ))
-
-            )}
-
           </View>
+        </Modal>
+      </SafeAreaView>
 
-        ) : (
-          // 災害時
-          <View style={styles.statsContainer}>
+  </GestureHandlerRootView>
 
-            <View style={styles.statBox}>
-
-              <Text style={styles.statTitle}>
-                移動中
-              </Text>
-
-              <Text style={styles.statValueLeft}>
-                6人
-              </Text>
-
-              <Image
-                source={require('../../assets/images/arukuhito.png')}
-                style={styles.statImage}
-              />
-
-            </View>
-
-            <View style={styles.statBox2}>
-
-              <Text style={styles.statTitle}>
-                収容される
-              </Text>
-
-              <Text style={styles.statValueLeft}>
-                12人
-              </Text>
-
-              <Image
-                source={require('../../assets/images/hinan.png')}
-                style={styles.statImage}
-              />
-
-            </View>
-
-          </View>
-
-        )}
-
-      </View>
-      {/* 下の情報欄 end */}
-
-    </SafeAreaView>
-  );
+);
 }
      
     
@@ -705,12 +625,63 @@ statImage: {
 },
 
 
+
+
+modalOverlay: {
+  flex: 1,
+  justifyContent: 'flex-end',
+  backgroundColor: 'rgba(0, 0, 0, 0.03)',
+},
+
+detailModal: {
+  backgroundColor: '#fff',
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  padding: 24,
+  minHeight: '90%',
+},
+
+modalHandle: {
+  width: 50,
+  height: 5,
+  backgroundColor: '#ccc',
+  borderRadius: 10,
+  alignSelf: 'center',
+  marginBottom: 20,
+},
+
+modalTitle: {
+  fontSize: 22,
+  fontWeight: 'bold',
+  marginBottom: 20,
+},
+
+modalText: {
+  fontSize: 16,
+  marginBottom: 12,
+  color: '#444',
+},
+
+closeButton: {
+  marginTop: 20,
+  backgroundColor: '#007AFF',
+  paddingVertical: 12,
+  borderRadius: 12,
+  alignItems: 'center',
+},
+
+closeButtonText: {
+  color: '#fff',
+  fontWeight: 'bold',
+  fontSize: 16,
+},
+
   // モード切替
   // 開発環境のみ表示　start
   modeContainer: {
   position: 'absolute',
 
-  top: 150,
+  top: 180,
   left: 20,
   right: 20,
 

@@ -28,7 +28,7 @@ export default function RootLayout() { // 関数名も RootLayout に変更
         "index" が最初の画面になります。
       */}
       <Stack.Screen name="index"  options={{ title: '仮ホーム' }} />
-      <Stack.Screen name="user-home"  options={{ title: 'ホーム' }} />
+      <Stack.Screen name="user_home"  options={{ title: 'ホーム' }} />
       <Stack.Screen name="my-page" options={{ title: 'マイQR' }} />
       <Stack.Screen name="profile-edit"  options={{ title: '個人情報編集' }} />
       <Stack.Screen name="offline-data"  options={{ title: 'データ管理' ,
