@@ -154,3 +154,48 @@ def get_location_area(user_id: str):
         "area_radius_m": 500,
         "in_area": area[4]
     }
+
+@app.get("/shelters/crowd-counts")
+def get_shelter_crowd_counts():
+    # データベースに接続する
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 各避難所の現在の混雑状況を取得する
+    # user_locationsテーブルから、recorded_atが現在時刻から5分以内の位置情報を対象にする
+    cur.execute(
+        """
+        WITH latest_locations AS (
+            SELECT DISTINCT ON (user_id)
+                user_id,
+                location,
+                recorded_at
+            FROM user_locations
+            WHERE recorded_at >= NOW() - (%s * INTERVAL '1 minute')
+            ORDER BY user_id, recorded_at DESC
+        )
+        SELECT
+            s.id AS shelter_id,
+            s.name AS shelter_name,
+            s.capacity,
+            COUNT(ll.user_id) AS current_user_count
+        FROM shelters s
+        LEFT JOIN latest_locations ll
+            ON ST_DWithin(
+                ll.location::geography,
+                s.location::geography,
+                500
+            )
+        GROUP BY s.id, s.name, s.capacity
+        ORDER BY s.name;
+        """,
+        (OLD_LOCATION_STALE_MINUTES,)
+    )
+    crowd_counts = cur.fetchall()
+
+    # カーソルとDB接続を閉じる
+    cur.close()
+    conn.close()
+
+    # 取得した混雑状況をレスポンスとして返す
+    return {"crowd_counts": [{"shelter_id": str(row[0]), "shelter_name": row[1], "capacity": row[2], "current_user_count": row[3]} for row in crowd_counts]}
