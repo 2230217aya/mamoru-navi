@@ -23,7 +23,26 @@ app.include_router(scan.router)
 class LocationRequest(BaseModel):
     user_id: str
     latitude: float
-    longitude: float
+    longitude: float  
+
+def convert_crowd_level(current_user_count: int, capacity: int):
+    # capacityが0の場合はcrowd_levelを「unknown」とする
+    if capacity is None or capacity <= 0:
+        return "unknown"
+    # 混雑度を計算する
+    crowd_rate = current_user_count / capacity
+    # 混雑度に応じてcrowd_levelを判定する
+    if crowd_rate < 0.5:
+        crowd_level = "空きあり"
+    elif crowd_rate < 0.8:
+        crowd_level = "やや混雑"
+    elif crowd_rate < 1.0:
+        crowd_level = "混雑"
+    else:
+        crowd_level = "満員"
+        
+
+    return round(crowd_rate, 2), crowd_level
 
 
 
@@ -87,7 +106,7 @@ def get_shelters():
     cur = conn.cursor()
 
     # sheltersテーブルから避難所情報を取得する
-    cur.execute("SELECT id, name, ST_Y(location) AS latitude, ST_X(location) AS longitude, capacity, status FROM shelters ORDER BY name;")
+    cur.execute("SELECT shelter_id, name, address, latitude, longitude, capacity FROM shelters ORDER BY name;")
     shelters = cur.fetchall()
 
     # カーソルとDB接続を閉じる
@@ -95,7 +114,7 @@ def get_shelters():
     conn.close()
 
     # 取得した避難所情報をレスポンスとして返す
-    return {"shelters": [{"id": str(shelter[0]), "name": shelter[1], "latitude": shelter[2], "longitude": shelter[3], "capacity": shelter[4], "status": shelter[5]} for shelter in shelters]}
+    return {"shelters": [{"shelter_id": str(shelter[0]), "name": shelter[1], "address": shelter[2], "latitude": shelter[3], "longitude": shelter[4], "capacity": shelter[5]} for shelter in shelters]}
 
 @app.get("/locations/{user_id}/latest")
 def get_latest_location(user_id: str):
@@ -126,15 +145,28 @@ def get_location_area(user_id: str):
     # 指定ユーザーの最新位置情報と、最も近い避難所を取得する
     # PostGISのST_Distanceで距離をメートル単位で計算する
     # ST_DWithinで避難所から500m以内かどうかを判定する
-    cur.execute("SELECT " \
-                "ul.user_id, " \
-                "s.id AS shelter_id, " \
-                "s.name AS shelter_name, " \
-                "ST_Distance(ul.location::geography, s.location::geography) AS distance_m, " \
-                "ST_DWithin(ul.location::geography, s.location::geography, 500) AS in_area " \
-                "FROM user_locations ul " \
-                "CROSS JOIN shelters s " \
-                "WHERE ul.user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
+    cur.execute(        
+        """
+        SELECT
+            ul.user_id,
+            s.shelter_id,
+            s.name AS shelter_name,
+            ST_Distance(
+                ul.location::geography,
+                ST_SetSRID(ST_MakePoint(s.longitude, s.latitude), 4326)::geography
+            ) AS distance_m,
+            ST_DWithin(
+                ul.location::geography,
+                ST_SetSRID(ST_MakePoint(s.longitude, s.latitude), 4326)::geography,
+                500
+            ) AS in_area
+        FROM user_locations ul
+        CROSS JOIN shelters s
+        WHERE ul.user_id = %s
+        ORDER BY ul.recorded_at DESC, distance_m ASC
+        LIMIT 1;
+        """, 
+        (user_id,))
     area = cur.fetchone()
 
     # カーソルとDB接続を閉じる
@@ -175,7 +207,7 @@ def get_shelter_crowd_counts():
             ORDER BY user_id, recorded_at DESC
         )
         SELECT
-            s.id AS shelter_id,
+            s.shelter_id AS shelter_id,
             s.name AS shelter_name,
             s.capacity,
             COUNT(ll.user_id) AS current_user_count
@@ -183,10 +215,10 @@ def get_shelter_crowd_counts():
         LEFT JOIN latest_locations ll
             ON ST_DWithin(
                 ll.location::geography,
-                s.location::geography,
+                ST_SetSRID(ST_MakePoint(s.longitude, s.latitude), 4326)::geography,
                 500
             )
-        GROUP BY s.id, s.name, s.capacity
+        GROUP BY s.shelter_id, s.name, s.capacity
         ORDER BY s.name;
         """,
         (OLD_LOCATION_STALE_MINUTES,)
@@ -198,4 +230,15 @@ def get_shelter_crowd_counts():
     conn.close()
 
     # 取得した混雑状況をレスポンスとして返す
-    return {"crowd_counts": [{"shelter_id": str(row[0]), "shelter_name": row[1], "capacity": row[2], "current_user_count": row[3]} for row in crowd_counts]}
+    results = []
+    for row in crowd_counts:
+        crowd_rate, crowd_level = convert_crowd_level(row[3], row[2])
+        results.append({
+            "shelter_id": str(row[0]),
+            "shelter_name": row[1],
+            "capacity": row[2],
+            "current_user_count": row[3],
+            "crowd_rate": crowd_rate,
+            "crowd_level": crowd_level
+        })
+    return {"crowd_counts": results}
