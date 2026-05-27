@@ -30,7 +30,7 @@ export default function dashboard() {
         <DashboardButton
           title={"身分証明書\n撮る"}
           img={require("@/assets/images/dashboard-photo.png")}
-          href="/"
+          href="../id-scan"
           backgroundColor="#9D9D9D"
           textColor="#FFF693"
           width="40%"

@@ -119,16 +119,14 @@ docker-compose down
 - WSLでsafe.directoryエラーが出る場合:
   - WSLのターミナルで git config --global --add safe.directory '\*' を実行してください。
 
-
-
 7. 開発ルール：ファイル作成の規約
-「まもるナビ」プロジェクトでは、コードの可読性、保守性、そしてチームメンバー間の認識統一を目的として、以下のファイル作成・命名規則を定めています。
+   「まもるナビ」プロジェクトでは、コードの可読性、保守性、そしてチームメンバー間の認識統一を目的として、以下のファイル作成・命名規則を定めています。
 
 1. 基本的な命名規則
-ファイル名:
-すべて小文字で記述します。（例: my-page.tsx）
-単語間はハイフン (-) で繋ぎます。（例: offline-data-management.tsx）
-React Native Component としてエクスポートする関数名も、ファイル名に合わせて PascalCase にします。（例: MyPageScreen, OfflineDataScreen）
+   ファイル名:
+   すべて小文字で記述します。（例: my-page.tsx）
+   単語間はハイフン (-) で繋ぎます。（例: offline-data-management.tsx）
+   React Native Component としてエクスポートする関数名も、ファイル名に合わせて PascalCase にします。（例: MyPageScreen, OfflineDataScreen）
 
 フォルダ名:
 すべて小文字で記述します。
@@ -139,26 +137,26 @@ Expo Router のルーティングでは、(tabs) のように丸括弧で囲む�
 React Component としてエクスポートする関数は、PascalCase で記述します。（例: MyPageScreen, PrimaryButton）
 
 2. ファイル配置の規約
-「まもるナビ」プロジェクトでは、コードの可読性、保守性、そしてチームメンバー間の認識統一を目的として、以下のファイル作成・命名規則を定めています。
-基本的な命名規則:
-ファイル名・フォルダ名: すべて小文字で、単語間はハイフン (-) で繋ぎます。（例: my-page.tsx, offline-data, api/v1）
-React Component 名: PascalCase で記述します。（例: MyPageScreen, ThemedText）
-app/ フォルダ: Expo Router のルーティング構造を定義する場所です。
-ファイル名がURLパスになります: app フォルダ直下の .tsx ファイルは、そのファイル名がそのままURLパスになります。
-app/index.tsx →→ / (アプリ起動時のデフォルトルート)
-app/my-page.tsx →→ /my-page
-app/profile-edit.tsx →→ /profile-edit
-app/dashboard.tsx →→ /dashboard
+   「まもるナビ」プロジェクトでは、コードの可読性、保守性、そしてチームメンバー間の認識統一を目的として、以下のファイル作成・命名規則を定めています。
+   基本的な命名規則:
+   ファイル名・フォルダ名: すべて小文字で、単語間はハイフン (-) で繋ぎます。（例: my-page.tsx, offline-data, api/v1）
+   React Component 名: PascalCase で記述します。（例: MyPageScreen, ThemedText）
+   app/ フォルダ: Expo Router のルーティング構造を定義する場所です。
+   ファイル名がURLパスになります: app フォルダ直下の .tsx ファイルは、そのファイル名がそのままURLパスになります。
+   app/index.tsx →→ / (アプリ起動時のデフォルトルート)
+   app/my-page.tsx →→ /my-page
+   app/profile-edit.tsx →→ /profile-edit
+   app/dashboard.tsx →→ /dashboard
 
 フォルダによるグループ化:
 app/(tabs)/ のように丸括弧で囲まれたフォルダは、タブナビゲーションのグループとして扱われます。
 このグループ内の index.tsx が、そのタブのデフォルト画面になります。
 グループ内の他のファイル (my-page.tsx, offline-data.tsx など) は、タブメニューに表示される各画面に対応します。
 
-_layout.tsx ファイル:
-app/ フォルダ直下にある _layout.tsx は、そのフォルダ内の画面群の「レイアウト」や「ナビゲーション構造」を定義します。
-app/(tabs)/_layout.tsx では、タブナビゲーション (createBottomTabNavigator のようなもの) を定義し、Tabs.Screen で各タブ画面 (index, my-page, offline-data など) を登録します。
-app/_layout.tsx（app フォルダ直下）では、スタックナビゲーション (createStackNavigator のようなもの) を定義し、initialRouteName でアプリ起動時の最初の画面を指定します。
+\_layout.tsx ファイル:
+app/ フォルダ直下にある \_layout.tsx は、そのフォルダ内の画面群の「レイアウト」や「ナビゲーション構造」を定義します。
+app/(tabs)/\_layout.tsx では、タブナビゲーション (createBottomTabNavigator のようなもの) を定義し、Tabs.Screen で各タブ画面 (index, my-page, offline-data など) を登録します。
+app/\_layout.tsx（app フォルダ直下）では、スタックナビゲーション (createStackNavigator のようなもの) を定義し、initialRouteName でアプリ起動時の最初の画面を指定します。
 
 src/ フォルダ:
 UIコンポーネント本体 (screens/) や、再利用可能な部品 (components/)、カスタムHooks (hooks/)、ユーティリティ関数 (utils/) などを、ルーティング構造とは切り離して一元管理します。
@@ -168,12 +166,12 @@ assets/ フォルダ:
 画像ファイル (images/) やフォントファイル (fonts/) などを配置します。
 
 3. Gitでのコミット規約
-ブランチ名: 機能追加は feat/XXX、バグ修正は fix/XXX、リファクタリングは refactor/XXX のように、プレフィックスを付けて分かりやすくします。（例: feat/frontend-myqr）
-コミットメッセージ: 以下の形式で、変更内容を明確に記述します。
-[Type]: [Subject]
-[Body (Optional)]
-Why: [変更理由]
-How: [変更内容の詳細]
+   ブランチ名: 機能追加は feat/XXX、バグ修正は fix/XXX、リファクタリングは refactor/XXX のように、プレフィックスを付けて分かりやすくします。（例: feat/frontend-myqr）
+   コミットメッセージ: 以下の形式で、変更内容を明確に記述します。
+   [Type]: [Subject]
+   [Body (Optional)]
+   Why: [変更理由]
+   How: [変更内容の詳細]
 
 Type: feat, fix, docs, style, refactor, test, chore など。
 Subject: 変更内容の簡潔な要約（命令形が望ましい）。
@@ -191,14 +189,78 @@ How: MyPageScreenコンポーネントにQRCodeライブラリを組み込み、
 [新しいファイル作成時の具体的な手順例]
 例1：新しい「設定」画面をタブに追加したい場合
 UIコードを作成: frontend/src/screens/SettingsScreen.tsx にUIコードを書く。
-App.tsx/_layout.tsxでタブ設定:
-frontend/app/_layout.tsx を開く。
-Tabs.Screen に name="settings" を追加し、component に () => import('../src/screens/SettingsScreen').default のような形でコンポーネントを渡す。（Expo Router の動的インポートを使うと、_layout.tsx を gọn gàng に保てます。もしくは、app/settings.tsx を作成し、その中にUIコードをコピー＆ペーストします。後者の方がExpo Routerの規約には忠実です。）
+App.tsx/\_layout.tsxでタブ設定:
+frontend/app/\_layout.tsx を開く。
+Tabs.Screen に name="settings" を追加し、component に () => import('../src/screens/SettingsScreen').default のような形でコンポーネントを渡す。（Expo Router の動的インポートを使うと、\_layout.tsx を gọn gàng に保てます。もしくは、app/settings.tsx を作成し、その中にUIコードをコピー＆ペーストします。後者の方がExpo Routerの規約には忠実です。）
 （推奨）app/settings.tsx を作成: frontend/src/screens/SettingsScreen.tsx の中身を、frontend/app/settings.tsx にコピー＆ペーストまたはラップ(推奨)し、export default function SettingsScreen() { ... } のようにします。
-_layout.tsx の Tabs.Screen では、name="settings" と component={SettingsScreen as any} を設定します。
+\_layout.tsx の Tabs.Screen では、name="settings" と component={SettingsScreen as any} を設定します。
 Gitにコミット: git add . → git commit -m "feat: add settings tab" → git push
 例2：QRコード画面の「個人情報編集」ボタンから遷移する画面を作成したい場合
 UIコードを作成: frontend/src/screens/ProfileEditScreen.tsx にUIコードを書く。
 app/profile-edit.tsx を作成: frontend/app/profile-edit.tsx に、src/screens/ProfileEditScreen.tsx のUIコードをインポートしてラップする形で作成する。（前回の例を参照）
 遷移元（MyPageScreen）でのrouter.push修正: frontend/app/my-page.tsx の「個人情報編集」ボタンの onPress を router.push('/profile-edit') に修正する。
 Gitにコミット: git add . → git commit -m "feat: add profile edit screen and navigation" → git push
+
+API接続設定（フロントエンド ⇄ バックエンド）
+
+本プロジェクトでは、開発環境（PC）で動作しているAPIサーバーに、実機（スマホ）から接続する必要があります。ネットワーク環境に合わせて、以下の 【パターンA】
+または 【パターンB】 のいずれかを選択してください。
+
+⚠️ 事前準備（共通）
+
+frontend フォルダ直下に .env ファイルを作成し、APIのベースURLを定義してください。 ※ .env を書き換えた後は、必ず Expo
+サーバーを再起動（Ctrl+C \rightarrow 再起動）してください。
+
+【パターンA】 LAN直結モード（推奨：高速・安定）
+
+PCの「モバイルホットスポット」機能を使用し、スマホとPCを直接接続する方法です。外部サーバーを経由しないため、動作が非常に高速で安定します。
+
+1. 接続手順
+
+- Windows の「モバイル ホットスポット」を ON にする。
+- スマホの Wi-Fi 設定で、PCが飛ばしている Wi-Fi に接続する。
+
+2. .env の設定 .env ファイルに以下を記述してください（PCのホットスポットIPアドレスを指定）。
+
+EXPO_PUBLIC_API_URL=http://192.168.137.1:8000
+
+3. 起動コマンド
+
+docker-compose exec frontend env REACT_NATIVE_PACKAGER_HOSTNAME=192.168.137.1 npx expo start --host lan --port 19000
+
+【パターンB】 Localtunnelモード（柔軟：ネットワーク制限がある場合）
+
+学校や企業のWi-Fiなど、端末同士の直接通信が禁止されている環境で使用する方法です。インターネット経由でAPIにアクセスします。
+
+1. APIトンネルの起動 別のターミナルを開き、以下のコマンドでAPIを外部公開します。
+
+# --subdomain には自分専用のユニークな名前をつけてください
+
+npx localtunnel --port 8000 --subdomain mamoru-navi-api-aya223
+
+表示された URL（https://mamoru-navi-api-aya223.loca.lt）をコピーします。
+
+2. .env の設定 .env ファイルに、コピーしたURLを記述してください。
+
+EXPO_PUBLIC_API_URL=https://mamoru-navi-api-aya223.loca.lt
+
+3. 起動コマンド
+
+docker-compose exec frontend npx expo start --tunnel
+
+💡 注意点（Localtunnel使用時）
+
+- 警告画面の回避: APIリクエストのヘッダーに 'Bypass-Tunnel-Reminder': 'true'
+  を含める必要があります（コード内で実装済み）。
+- ブラウザでの事前承諾: 初回アクセス時のみ、スマホのブラウザで一度 URL を開き、「Click to
+  Continue」ボタンを押して接続を許可してください。
+
+🛠 接続確認チェックリスト
+
+もし API 通信で Network request failed が出る場合は、以下を確認してください。
+
+- [ ] .env の URL は正しいか？
+- [ ] .env 書き換え後、Expo サーバーを再起動したか？
+- [ ] Windows ファイアウォールが OFF になっているか？（特にパブリックネットワーク）
+- [ ] （パターンAの場合）スマホが PC のホットスポットに接続されているか？
+- [ ] （パターンBの場合）localtunnel コマンドを起動し続けているか？
