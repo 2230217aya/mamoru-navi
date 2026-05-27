@@ -1,5 +1,5 @@
 // app/scan-qr.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Text,
   View,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  ActivityIndicator, // ★追加：読み込み中のぐるぐる用
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
@@ -16,43 +17,42 @@ export default function ScanQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
-  // 【重要】職員用アプリが保持している設定値 (本来は設定画面やDBから取得)
   const STAFF_CONFIG = {
-    location_id: "123e4567-e89b-12d3-a456-426614174001", // 自分の施設ID
-    scan_mode: "shelter", // "facility" または "shelter"
+    location_id: "123e4567-e89b-12d3-a456-426614174001",
+    scan_mode: "shelter",
   };
 
   if (!permission) {
-    // 権限読み込み中
+    // ★ id-scan.tsx と同じセンター配置に変更
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#FDE047" />
+        <Text style={styles.loadingText}>準備中...</Text>
       </View>
     );
   }
 
   if (!permission.granted) {
-    // 権限がない場合は許可を求めるボタンを表示
+    // ★ id-scan.tsx と同じスタイルに変更
     return (
-      <View style={styles.container}>
-        <Text style={{ textAlign: "center", marginBottom: 10 }}>
-          カメラへのアクセス権限が必要です
-        </Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>権限を許可する</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.center}>
+          <Text style={styles.errorText}>カメラへのアクセス権限が必要です</Text>
+          <TouchableOpacity style={styles.button} onPress={requestPermission}>
+            <Text style={styles.buttonText}>権限を許可する</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  // QRコードを読み取った時の処理
   const handleBarcodeScanned = async ({ data }: { data: string }) => {
-    setScanned(true); // 二重読み込み防止
+    setScanned(true);
 
     try {
-      // 1. APIにデータを送信
       const baseUrl =
-        process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000"; // .envがなければlocalhostを使う
+        process.env.EXPO_PUBLIC_API_URL ||
+        "https://mamoru-navi-api-aya223.loca.lt";
       const response = await fetch(`${baseUrl}/scan/qr-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,15 +69,13 @@ export default function ScanQRScreen() {
 
       const result = await response.json();
 
-      // 2. 結果画面にデータを渡して遷移する
-      // JSONを文字列化して渡すか、グローバル状態管理を使いますが、ここでは簡単のためJSON文字列で渡します
       router.push({
-        pathname: "../scan-result",
+        pathname: "/scan-result",
         params: { result: JSON.stringify(result) },
       });
     } catch (error) {
       Alert.alert("エラー", "QRコードの処理に失敗しました");
-      setScanned(false); // 再試行可能にする
+      setScanned(false);
     }
   };
 
@@ -93,7 +91,6 @@ export default function ScanQRScreen() {
           }}
           style={StyleSheet.absoluteFillObject}
         />
-        {/* スキャン範囲を示す枠線（ガイド） */}
         <View style={styles.overlay}>
           <View style={styles.unfocusedContainer}></View>
           <View style={styles.middleContainer}>
@@ -124,6 +121,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 50,
   },
+  // ★ id-scan.tsx から移植したスタイル
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+  },
+  errorText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  // -----------------------------------
   title: { fontSize: 24, fontWeight: "bold", color: "#fff", marginBottom: 20 },
   cameraContainer: {
     width: "90%",
