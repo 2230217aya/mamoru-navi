@@ -1,12 +1,24 @@
+// ===== アイコン =====
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+
+// ===== 地図 =====
+import MapView, { Marker, Polyline } from 'react-native-maps';
+
+// ===== 画面遷移 =====
 import { router } from 'expo-router';
+
+// ===== BottomSheet =====
 import HomeBottomSheet from '../components/home/HomeBottomSheet';
+
+// ===== Reanimated =====
 import 'react-native-reanimated';
 
+// ===== Gesture Handler =====
 import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
+
+// ===== React Native =====
 import {
   SafeAreaView,
   StyleSheet,
@@ -15,26 +27,31 @@ import {
   View,
   Text,
   Image,
-   Modal,
+  Modal,
   Animated,
 } from 'react-native';
-import { useEffect, useState } from 'react';
+
+// ===== React =====
+import { useEffect, useState, useRef } from 'react';
+
+// ===== 災害警報バナー =====
 import EmergencyAlertBanner
   from '../components/home/EmergencyAlertBanner';
-// モード
+
+// ===== モード定義 =====
 const MODES = {
   NORMAL: 'normal',
   DISASTER: 'disaster',
 };
 
-// types
+// ===== 型定義 =====
 type OfficeService = {
   id: number;
   title: string;
   number: string;
 };
 
-// クイック検索アイテム 仮データ*
+// ===== クイック検索用の仮データ =====
 const QUICK_SEARCH_ITEMS = [
   {
     id: 1,
@@ -49,7 +66,8 @@ const QUICK_SEARCH_ITEMS = [
     title: '体育館',
   },
 ];
-// 平常時施設情報表示 仮データ
+
+// ===== 平常時施設情報の仮データ =====
 const MOCK_OFFICE_SERVICES: OfficeService[] = [
   {
     id: 1,
@@ -74,36 +92,104 @@ const MOCK_OFFICE_SERVICES: OfficeService[] = [
 ];
 
 export default function UserHome() {
-const [showDetail, setShowDetail] = useState(false);
-  // ===== state =====
+
+  // ===== 詳細モーダル表示状態 =====
+  const [showDetail, setShowDetail] = useState(false);
+
+  // ===== BottomSheet表示状態 =====
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+  
+// ===== 選択されたクイック検索 =====
+const [selectedQuickSearch, setSelectedQuickSearch] =
+  useState<string | null>(null);
+  // ===== 現在モード =====
   const [mode, setMode] = useState(MODES.NORMAL);
 
+  // ===== 施設サービス一覧 =====
   const [officeServices, setOfficeServices] =
     useState<OfficeService[]>([]);
 
+  // ===== MapView参照 =====
+  const mapRef = useRef<MapView | null>(null);
+
+  // ===== ローディング状態 =====
   const [loading, setLoading] = useState(false);
 
+  // ===== 最終更新時刻 =====
   const [lastUpdate, setLastUpdate] = useState('');
 
+  // ===== 施設位置 =====
   const [facilityLocation, setFacilityLocation] =
     useState({
       latitude: 34.6937,
       longitude: 135.5023,
     });
 
-  // ===== API =====
+  // ===== 現在地 =====
+  const origin = {
+    latitude: 34.706443,
+    longitude: 135.503214,
+  };
+
+  // ===== 避難所位置 =====
+  const destination = {
+    latitude: 34.707500,
+    longitude: 135.504684,
+  };
+
+  // ===== 仮ルートデータ =====
+  const routeCoordinates = [
+    {
+      latitude: 34.706443,
+      longitude: 135.503214,
+    },
+    {
+      latitude: 34.706443,
+      longitude: 135.503432,
+    },
+
+    {
+      latitude: 34.707161,
+      longitude: 135.503310,
+    },
+
+    {
+      latitude: 34.707216,
+      longitude: 135.503969,
+    },
+
+    {
+      latitude: 34.707052,
+      longitude: 135.504033,
+    },
+
+    {
+      latitude: 34.707237,
+      longitude: 135.504852,
+    },
+
+    {
+      latitude: 34.707500,
+      longitude: 135.504684,
+    },
+  ];
+
+  // ===== API取得 =====
   const fetchOfficeServices = async () => {
     try {
+
+      // ===== ローディング開始 =====
       setLoading(true);
 
-      // ===== future API =====
+      // ===== 今後API接続予定 =====
       // const response = await axios.get(...)
 
-      // 仮
+      // ===== 仮データ使用 =====
       const data = MOCK_OFFICE_SERVICES;
 
       setOfficeServices(data);
 
+      // ===== 更新時間保存 =====
       setLastUpdate(
         new Date().toLocaleTimeString('ja-JP', {
           hour: '2-digit',
@@ -112,206 +198,314 @@ const [showDetail, setShowDetail] = useState(false);
       );
 
     } catch (error) {
+
+      // ===== エラー表示 =====
       console.log(error);
+
     } finally {
+
+      // ===== ローディング終了 =====
       setLoading(false);
     }
   };
 
-  //初期化
+  // ===== 初期読み込み =====
   useEffect(() => {
     fetchOfficeServices();
   }, []);
 
+  // ===== 市区役所へ移動 =====
+  const moveToCityHall = () => {
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: 34.6937,
+        longitude: 135.5023,
+
+        // ===== 地図拡大率 =====
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
+      },
+      1000
+    );
+  };
+
   return (
 
-  <GestureHandlerRootView style={{ flex: 1 }}>
-    <SafeAreaView style={styles.container}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
 
-      {/* Map */}
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: facilityLocation.latitude,
-          longitude: facilityLocation.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      >
+      <SafeAreaView style={styles.container}>
 
+        {/* ===== 地図 ===== */}
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={{
+            latitude: facilityLocation.latitude,
+            longitude: facilityLocation.longitude,
+
+            // ===== 初期地図拡大率 =====
+            latitudeDelta: 0.002,
+            longitudeDelta: 0.002,
+          }}
+        >
+
+          {mode === MODES.NORMAL ? (
+
+            // ===== 平常モード施設マーカー =====
+            <Marker
+              coordinate={facilityLocation}
+              title="大阪市役所"
+              description="公共施設"
+            />
+
+          ) : (
+
+            <>
+              {/* ===== 現在地マーカー ===== */}
+              <Marker
+                coordinate={origin}
+                title="現在地"
+                description="ユーザー位置"
+              />
+
+              {/* ===== 避難所マーカー ===== */}
+              <Marker
+                coordinate={destination}
+                pinColor="red"
+                title="避難所"
+                description="開設中"
+              />
+
+              {/* ===== 避難ルート ===== */}
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#1976d2"
+                strokeWidth={5}
+              />
+            </>
+          )}
+
+        </MapView>
+
+        {/* ===== ヘッダー ===== */}
+        <View style={styles.header}>
+
+          {/* ===== メニューボタン ===== */}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => router.push('../offline-data')}
+          >
+            <Ionicons
+              name="menu"
+              size={28}
+              color="#333"
+            />
+          </TouchableOpacity>
+
+          {/* ===== 検索欄 ===== */}
+          <View style={styles.searchContainer}>
+
+            <Ionicons
+              name="search"
+              size={20}
+              color="#666"
+              style={styles.searchIcon}
+            />
+
+            <TextInput
+              placeholder="検索"
+              placeholderTextColor="#888"
+              style={styles.searchInput}
+            />
+          </View>
+
+          {/* ===== マイページ ===== */}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => router.push('../my-page')}
+          >
+            <Image
+              source={require('../../assets/images/userpage.png')}
+              style={{ width: 32, height: 32 }}
+            />
+          </TouchableOpacity>
+
+        </View>
+
+        {/* ===== 平常 / 災害モード切替 ===== */}
         {mode === MODES.NORMAL ? (
-          <Marker
-            coordinate={facilityLocation}
-            title="大阪市役所"
-            description="公共施設"
-          />
+
+          // ===== 平常モード：クイック検索 =====
+          <View style={styles.quickSearchContainer}>
+
+            {QUICK_SEARCH_ITEMS.map((item) => (
+
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.quickSearchButton,
+                  selectedQuickSearch === item.title &&
+                    styles.activeQuickSearchButton
+                ]}
+                onPress={() => {
+
+                  // ===== 已選取時 → 取消選取 =====
+                  if (selectedQuickSearch === item.title) {
+
+                    setSelectedQuickSearch(null);
+
+                    setShowBottomSheet(false);
+
+                    return;
+                  }
+
+                  // ===== 新選取 =====
+                  setSelectedQuickSearch(item.title);
+
+                  // ===== 市区役所 =====
+                  if (item.title === '市区役所') {
+
+                    moveToCityHall();
+
+                    setShowBottomSheet(true);
+                  }
+                }}
+              >
+
+                <Text style={styles.quickSearchText}>
+                  {item.title}
+                </Text>
+
+              </TouchableOpacity>
+
+            ))}
+
+          </View>
+
         ) : (
-          <Marker
-            coordinate={{
-              latitude: 34.707500,
-              longitude: 135.504684,
+
+          // ===== 災害モード：警報表示 =====
+          <EmergencyAlertBanner
+            level="5"
+            title="緊急地震速報"
+            message="大阪府北部で地震発生"
+            levelText="震度5弱"
+          />
+
+        )}
+
+        {/* ===== モード切替（開発用） ===== */}
+        <View style={styles.modeContainer}>
+
+          <Text style={styles.modeText}>
+            開発環境のみ表示
+          </Text>
+
+          {/* ===== 平常モードボタン ===== */}
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              mode === MODES.NORMAL &&
+              styles.activeModeButton
+            ]}
+            onPress={() => {
+
+              // ===== 平常モードへ変更 =====
+              setMode(MODES.NORMAL);
+
+              // ===== BottomSheet非表示 =====
+              setShowBottomSheet(false);
             }}
-            pinColor="red"
-            title="避難所"
-            description="開設中"
+          >
+
+            <Text
+              style={[
+                styles.modeText,
+                mode === MODES.NORMAL &&
+                styles.activeModeText
+              ]}
+            >
+              平常
+            </Text>
+
+          </TouchableOpacity>
+
+          {/* ===== 災害モードボタン ===== */}
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              mode === MODES.DISASTER &&
+              styles.activeModeButton
+            ]}
+            onPress={() => {
+
+              // ===== 災害モードへ変更 =====
+              setMode(MODES.DISASTER);
+
+              // ===== BottomSheet表示 =====
+              setShowBottomSheet(true);
+
+              // ===== 避難所へ移動 =====
+              mapRef.current?.animateToRegion(
+                {
+                  latitude: destination.latitude,
+                  longitude: destination.longitude,
+
+                  // ===== 災害モード時の拡大率 =====
+                  latitudeDelta: 0.003,
+                  longitudeDelta: 0.003,
+                },
+                1000
+              );
+            }}
+          >
+
+            <Text
+              style={[
+                styles.modeText,
+                mode === MODES.DISASTER &&
+                styles.activeModeText
+              ]}
+            >
+              災害
+            </Text>
+
+          </TouchableOpacity>
+
+        </View>
+
+        {/* ===== BottomSheet ===== */}
+        {showBottomSheet && (
+          <HomeBottomSheet
+            mode={mode}
+            officeServices={officeServices}
+            loading={loading}
+            lastUpdate={lastUpdate}
+            onRefresh={fetchOfficeServices}
           />
         )}
 
-      </MapView>
-
-      {/* Header */}
-      <View style={styles.header}>
-
-        {/* Menu */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.push('../offline-data')}
-        >
-          <Ionicons
-            name="menu"
-            size={28}
-            color="#333"
-          />
-        </TouchableOpacity>
-
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={20}
-            color="#666"
-            style={styles.searchIcon}
-          />
-
-          <TextInput
-            placeholder="検索"
-            placeholderTextColor="#888"
-            style={styles.searchInput}
-          />
-        </View>
-
-        {/* MyPage */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.push('../my-page')}
-        >
-          <Image
-            source={require('../../assets/images/userpage.png')}
-            style={{ width: 32, height: 32 }}
-          />
-        </TouchableOpacity>
-
-      </View>
-
-      {/* ===== 平常 / 災害 切換區 ===== */}
-      {mode === MODES.NORMAL ? (
-
-        // ===== 平常模式：Quick Search =====
-        <View style={styles.quickSearchContainer}>
-
-          {QUICK_SEARCH_ITEMS.map((item) => (
-
-            <TouchableOpacity
-              key={item.id}
-              style={styles.quickSearchButton}
-            >
-              <Text style={styles.quickSearchText}>
-                {item.title}
-              </Text>
-            </TouchableOpacity>
-
-          ))}
-
-        </View>
-
-      ) : (
-
-        // ===== 災害模式：警報 =====
-        <EmergencyAlertBanner
-
-          level="5"
-          title="緊急地震速報"
-          message="大阪府北部で地震発生"
-          levelText="震度5弱"
-
-        />
-
-      )}
-      {/* モード切替 // 開発環境のみ表示　start */}
-      <View style={styles.modeContainer}>
-
-        <Text style={styles.modeText}>
-          開発環境のみ表示
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.modeButton,
-            mode === MODES.NORMAL &&
-              styles.activeModeButton
-          ]}
-          onPress={() => setMode(MODES.NORMAL)}
-        >
-          <Text
-            style={[
-              styles.modeText,
-              mode === MODES.NORMAL &&
-                styles.activeModeText
-            ]}
-          >
-            平常
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.modeButton,
-            mode === MODES.DISASTER &&
-              styles.activeModeButton
-          ]}
-          onPress={() => setMode(MODES.DISASTER)}
-        >
-          <Text
-            style={[
-              styles.modeText,
-              mode === MODES.DISASTER &&
-                styles.activeModeText
-            ]}
-          >
-            災害
-          </Text>
-        </TouchableOpacity>
-
-      </View>
-      {/* 開発環境のみ表示　end*/}
-
-     
-
-
-      {/* 下の情報欄 start*/}
-      <HomeBottomSheet
-          mode={mode}
-          officeServices={officeServices}
-          loading={loading}
-          lastUpdate={lastUpdate}
-          onRefresh={fetchOfficeServices}
-        />
-              {/* 下の情報欄 end */}
+        {/* ===== 詳細モーダル ===== */}
         <Modal
           visible={showDetail}
           transparent
           animationType="slide"
         >
+
           <View style={styles.modalOverlay}>
 
             <View style={styles.detailModal}>
 
+              {/* ===== モーダルハンドル ===== */}
               <View style={styles.modalHandle} />
 
+              {/* ===== タイトル ===== */}
               <Text style={styles.modalTitle}>
                 避難所詳細情報
               </Text>
 
+              {/* ===== 情報 ===== */}
               <Text style={styles.modalText}>
                 現在収容人数：12人
               </Text>
@@ -324,24 +518,29 @@ const [showDetail, setShowDetail] = useState(false);
                 ペット同行可能
               </Text>
 
+              {/* ===== 閉じるボタン ===== */}
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowDetail(false)}
               >
+
                 <Text style={styles.closeButtonText}>
                   閉じる
                 </Text>
+
               </TouchableOpacity>
 
             </View>
 
           </View>
+
         </Modal>
+
       </SafeAreaView>
 
-  </GestureHandlerRootView>
+    </GestureHandlerRootView>
 
-);
+  );
 }
      
     
@@ -429,6 +628,9 @@ const styles = StyleSheet.create({
     padding: 6,
 
     },
+    activeQuickSearchButton: {
+  backgroundColor: '#d0d0d0',
+},
 
     quickSearchButton: {
     flexDirection: 'row',
