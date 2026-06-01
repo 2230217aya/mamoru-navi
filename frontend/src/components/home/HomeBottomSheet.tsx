@@ -1,6 +1,6 @@
 // ===== React =====
 import React, { useMemo, useRef, useState } from 'react';
-
+import { router } from 'expo-router';
 // ===== BottomSheet =====
 import BottomSheet, {
   BottomSheetView,
@@ -53,7 +53,7 @@ export default function HomeBottomSheet({
 
   const snapPoints = useMemo(() => {
     if (mode === MODES.NORMAL) {
-      return ['15%', '47%'];
+      return ['16%', '47%'];
     }
     return ['33%', '88%'];
   }, [mode]);
@@ -92,10 +92,10 @@ export default function HomeBottomSheet({
 
           {mode === MODES.NORMAL && (
             <TouchableOpacity
-              style={styles.reserveButton}
-              onPress={() => {
-                console.log('予約');
-              }}
+              style={styles.reserveButton
+                
+              }
+             onPress={() => router.push('../reservation')}
             >
               <Text style={styles.reserveButtonText}>
                 予約
