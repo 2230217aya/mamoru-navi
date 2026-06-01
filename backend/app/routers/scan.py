@@ -6,6 +6,10 @@ from typing import Optional, Dict, Any
 from database import get_db_connection
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from typing import List
+import json
+from typing import List
+
 
 router = APIRouter(
     prefix="/scan",
@@ -29,6 +33,34 @@ class QRScanResponse(BaseModel):
     message: str
     user_info: Optional[Dict[str, Any]] = None
     action_result: Optional[Dict[str, Any]] = None
+
+# --- 一括同期用のリクエスト/レスポンスモデル ---
+class SyncQueueItem(BaseModel):
+    transaction_id: str # スマホ側で生成したcheckin_id
+    action_type: str    # 'CHECK_IN' などの操作種別
+    payload: str        # JSON文字列 (user_id, shelter_id など)
+    created_at: str     # オフラインでスキャンした時刻
+
+class SyncRequest(BaseModel):
+    items: List[SyncQueueItem]
+
+class SyncResponse(BaseModel):
+    status: str
+    message: str
+    synced_count: int
+
+
+class SyncItem(BaseModel):
+    queue_id: int
+    transaction_id: str
+    action_type: str
+    payload: str  # JSON文字列
+    created_at: str
+    sync_status: str
+
+class SyncRequest(BaseModel):
+    items: List[SyncItem]
+
 
 # --- 共通処理関数 (リファクタリング) ---
 # ユーザーIDが確定した後の「受付処理（DB操作）」だけを切り出した関数です
@@ -171,3 +203,48 @@ async def process_id_card_scan(request: IDScanRequest):
     finally:
         cur.close()
         conn.close()
+
+
+
+
+
+@router.post("/sync", summary="オフラインで記録されたデータを一括同期する")
+def sync_offline_data(request: SyncRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    synced_count = 0
+    try:
+        for item in request.items:
+            if item.action_type == 'CHECK_IN':
+                # フロントから来た payload (JSON文字列) を辞書に変換
+                payload_data = json.loads(item.payload)
+                user_id = payload_data.get('user_id')
+                shelter_id = payload_data.get('shelter_id')
+                # 端末で記録した時刻を使用
+                checkin_time = item.created_at 
+                
+                # すでに同じID(transaction_id)が保存されていないかチェック
+                cur.execute("SELECT checkin_id FROM checkins WHERE checkin_id = %s;", (item.transaction_id,))
+                exists = cur.fetchone()
+
+                if not exists:
+                    # データベースに新規登録
+                    cur.execute("""
+                        INSERT INTO checkins (checkin_id, user_id, shelter_id, checkin_time, method, sync_status) 
+                        VALUES (%s, %s, %s, %s, 'offline_sync', 'synced');
+                    """, (item.transaction_id, user_id, shelter_id, checkin_time))
+                
+                synced_count += 1
+                
+        # ループが終わったら全て確定
+        conn.commit()
+        return {"status": "success", "synced_count": synced_count}
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Sync Error: {e}") # ターミナルにエラー詳細を出す
+        raise HTTPException(status_code=500, detail="データベースの同期処理に失敗しました")
+    finally:
+        cur.close()
+        conn.close()      

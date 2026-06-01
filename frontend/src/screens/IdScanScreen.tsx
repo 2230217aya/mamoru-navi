@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
+import { LocalDB } from "@/src/db/database";
+import * as Crypto from "expo-crypto";
 
 export default function IDScanScreen() {
   const router = useRouter();
@@ -51,32 +53,31 @@ export default function IDScanScreen() {
   }
 
   // 3. 写真撮影とAPI送信処理
-  const takePicture = async () => {
-    if (!cameraRef.current || isTakingPhoto) return;
+  const takePicture = async (camera: any) => {
+    if (isTakingPhoto) return;
+    setIsTakingPhoto(true);
 
     try {
-      setIsTakingPhoto(true);
-
-      // 1. 写真を撮影
-      const photo = await cameraRef.current.takePictureAsync({
+      // --- 1. 写真を撮影 (一度だけ行う) ---
+      // 引数の camera を使用します
+      const photo = await camera.takePictureAsync({
         base64: true,
         quality: 0.5,
       });
 
       if (!photo) throw new Error("写真の撮影に失敗しました");
 
-      // 2. API接続先の決定
-      // localhostではなく、PCのIPアドレスを指定してください
+      // --- 2. API接続先の決定 (ここを維持) ---
       const baseUrl =
         process.env.EXPO_PUBLIC_API_URL ||
         "https://mamoru-navi-api-aya223.loca.lt";
 
-      // 3. APIに送信
+      // --- 3. APIに送信 ---
       const response = await fetch(`${baseUrl}/scan/id-card`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Bypass-Tunnel-Reminder": "true", // ローカル開発環境でトンネルサービスを使用している場合の回避策
+          "Bypass-Tunnel-Reminder": "true",
         },
         body: JSON.stringify({
           image_base64: photo.base64,
@@ -85,24 +86,72 @@ export default function IDScanScreen() {
         }),
       });
 
-      // 4. レスポンスチェック
+      // --- 4. レスポンスチェック ---
       if (!response.ok) {
         throw new Error(`サーバーエラー: ${response.status}`);
       }
 
       const result = await response.json();
 
-      // 5. 結果画面へ遷移
+      // --- 5. 結果画面へ遷移 ---
       router.push({
-        pathname: "/scan-result",
+        pathname: "/scan-result", // パスは /scan-result 等に合わせる
         params: { result: JSON.stringify(result) },
       });
-    } catch (error: any) {
-      console.error("Error during ID scan:", error);
-      Alert.alert("エラー", error.message || "身分証の読み取りに失敗しました");
-    } finally {
-      // 成功しても失敗しても、最後に必ず「撮影中」フラグをオフにする
-      setIsTakingPhoto(false);
+    } catch (error) {
+      // ここが「オフライン」または「サーバーエラー」時の処理
+      console.log(
+        "Offline detected or API error, saving ID scan to local DB...",
+      );
+
+      try {
+        // IDスキャンの場合、本来はOCRで名前を出すが、オフライン時は「ID不明のまま保存」
+        const checkinId = Crypto.randomUUID();
+        const tempUserId = "unknown_id_" + Date.now();
+
+        await LocalDB.saveCheckin({
+          checkin_id: checkinId,
+          user_id: tempUserId,
+          shelter_id: STAFF_CONFIG.location_id,
+          checkin_time: new Date().toISOString(),
+          method: "id_card",
+          sync_status: "pending",
+          remarks: "身分証写真による受付（要確認）",
+        });
+
+        await LocalDB.addToSyncQueue(
+          checkinId,
+          "CHECK_IN",
+          JSON.stringify({
+            user_id: tempUserId,
+            shelter_id: STAFF_CONFIG.location_id,
+          }),
+        );
+
+        const offlineResult = {
+          status: "offline",
+          message: "身分証画像をオフライン保存しました。",
+          user_info: {
+            name: "（未特定ユーザー）",
+            blood_type: "不明",
+            medical_conditions: "不明",
+            phone_number: "不明",
+          },
+          action_result: {
+            type: "shelter_checkin",
+            success: true,
+            detail: "画像保存完了。後で照合してください。",
+          },
+        };
+
+        router.push({
+          pathname: "/scan-result",
+          params: { result: JSON.stringify(offlineResult) },
+        });
+      } catch (dbError) {
+        Alert.alert("エラー", "ローカル保存に失敗しました");
+        setIsTakingPhoto(false);
+      }
     }
   };
 
