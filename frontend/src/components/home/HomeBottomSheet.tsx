@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   View,
+  TouchableOpacity,
 } from 'react-native';
 
 // ===== Components =====
@@ -52,7 +53,7 @@ export default function HomeBottomSheet({
 
   const snapPoints = useMemo(() => {
     if (mode === MODES.NORMAL) {
-      return ['15%', '45%'];
+      return ['15%', '47%'];
     }
     return ['33%', '88%'];
   }, [mode]);
@@ -81,9 +82,28 @@ export default function HomeBottomSheet({
         <BottomSheetView style={styles.container}>
 
           {/* ===== 標題 ===== */}
+        <View style={styles.titleRow}>
+
           <Text style={styles.title}>
-            {mode === MODES.NORMAL ? '大阪市役所' : '避難所状況'}
+            {mode === MODES.NORMAL
+              ? '大阪市役所'
+              : '避難所状況'}
           </Text>
+
+          {mode === MODES.NORMAL && (
+            <TouchableOpacity
+              style={styles.reserveButton}
+              onPress={() => {
+                console.log('予約');
+              }}
+            >
+              <Text style={styles.reserveButtonText}>
+                予約
+              </Text>
+            </TouchableOpacity>
+          )}
+
+        </View>
 
           {/* ========================= */}
           {/* NORMAL MODE */}
@@ -149,13 +169,18 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
+  fontSize: 22,
+  fontWeight: 'bold',
+},
+  titleRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 16,
+},
 
   scrollContent: {
-    paddingBottom: 200, // ⭐ 避免被底部卡片蓋住
+    paddingBottom: 200, 
   },
 
   fixedStatsContainer: {
@@ -211,4 +236,17 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
   },
+  // ===== 予約ボタン =====
+reserveButton: {
+  backgroundColor: '#FFEE37',
+  paddingHorizontal: 30,
+  paddingVertical: 8,
+  borderRadius: 20,
+},
+
+reserveButtonText: {
+  color: '#000',
+  fontSize: 14,
+  fontWeight: 'bold',
+},
 });

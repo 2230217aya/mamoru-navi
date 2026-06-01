@@ -350,7 +350,7 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
                 ]}
                 onPress={() => {
 
-                  // ===== 已選取時 → 取消選取 =====
+                  
                   if (selectedQuickSearch === item.title) {
 
                     setSelectedQuickSearch(null);
@@ -360,10 +360,10 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
                     return;
                   }
 
-                  // ===== 新選取 =====
+                  
                   setSelectedQuickSearch(item.title);
 
-                  // ===== 市区役所 =====
+                 
                   if (item.title === '市区役所') {
 
                     moveToCityHall();
