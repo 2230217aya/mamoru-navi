@@ -3,6 +3,13 @@ from pydantic import BaseModel
 from config import OLD_LOCATION_STALE_MINUTES
 from routers import users
 from routers import scan
+from routers import checkins
+from routers import shelters
+from routers import locations
+from routers import map
+from routers import notifications
+from routers import reservations
+from routers import danger_area
 from database import get_db_connection
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -19,6 +26,13 @@ app.add_middleware(
 
 app.include_router(users.router)
 app.include_router(scan.router)
+app.include_router(checkins.router)
+app.include_router(shelters.router)
+app.include_router(locations.router)
+app.include_router(map.router)
+app.include_router(notifications.router)
+app.include_router(reservations.router)
+app.include_router(danger_area.router)
 
 class LocationRequest(BaseModel):
     user_id: str
