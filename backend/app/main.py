@@ -242,3 +242,67 @@ def get_shelter_crowd_counts():
             "crowd_level": crowd_level
         })
     return {"crowd_counts": results}
+
+@app.get("/shelters/heatmap")
+def get_shelter_heatmap_data():
+    # データベースに接続する
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 各避難所の現在の混雑状況を取得する
+    # user_locationsテーブルから、recorded_atが現在時刻から5分以内の位置情報を対象にする
+    cur.execute(
+        """
+        WITH latest_locations AS (
+            SELECT DISTINCT ON (user_id)
+                user_id,
+                location,
+                recorded_at
+            FROM user_locations
+            WHERE recorded_at >= NOW() - (%s * INTERVAL '1 minute')
+            ORDER BY user_id, recorded_at DESC
+        )
+        SELECT
+            s.shelter_id AS shelter_id,
+            s.name AS shelter_name,
+            s.latitude,
+            s.longitude,
+            s.capacity,
+            COUNT(ll.user_id) AS current_user_count
+        FROM shelters s
+        LEFT JOIN latest_locations ll
+            ON ST_DWithin(
+                ll.location::geography,
+                ST_SetSRID(ST_MakePoint(s.longitude, s.latitude), 4326)::geography,
+                500
+            )
+        GROUP BY s.shelter_id, s.name, s.latitude, s.longitude, s.capacity
+        ORDER BY s.name;
+        """,
+        (OLD_LOCATION_STALE_MINUTES,)
+    )
+
+    heatmap_rows = cur.fetchall()
+
+    # カーソルとDB接続を閉じる
+    cur.close()
+    conn.close()
+
+    #ヒートマップ用データをレスポンスとして返す
+    heatmap_data = []
+
+    for row in heatmap_rows:
+        capacity = row[4]
+        current_user_count = row[5]
+        crowd_rate, crowd_level = convert_crowd_level(current_user_count, capacity)
+        heatmap_data.append({
+            "shelter_id": str(row[0]),
+            "shelter_name": row[1],
+            "latitude": row[2],
+            "longitude": row[3],
+            "capacity": capacity,
+            "current_user_count": current_user_count,
+            "crowd_rate": crowd_rate,
+            "crowd_level": crowd_level
+        })
+    return {"heatmap_data": heatmap_data}
