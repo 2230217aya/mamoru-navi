@@ -116,6 +116,23 @@ def get_shelters():
     # 取得した避難所情報をレスポンスとして返す
     return {"shelters": [{"shelter_id": str(shelter[0]), "name": shelter[1], "address": shelter[2], "latitude": shelter[3], "longitude": shelter[4], "capacity": shelter[5]} for shelter in shelters]}
 
+@app.get("/offline/map-data")
+def get_offline_map_data():
+    # データベースに接続する
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # sheltersテーブルから避難所情報を取得する
+    cur.execute("SELECT shelter_id, name, address, latitude, longitude, capacity, update_at FROM shelters ORDER BY name;")
+    shelters = cur.fetchall()
+
+    # カーソルとDB接続を閉じる
+    cur.close()
+    conn.close()
+
+    # 取得した避難所情報をレスポンスとして返す
+    return {"shelters": [{"shelter_id": str(shelter[0]), "name": shelter[1], "address": shelter[2], "latitude": shelter[3], "longitude": shelter[4], "capacity": shelter[5], "updated_at": shelter[6]} for shelter in shelters]}
+
 @app.get("/locations/{user_id}/latest")
 def get_latest_location(user_id: str):
     # データベースに接続する
