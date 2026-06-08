@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from config import OLD_LOCATION_STALE_MINUTES
 from routers import users
@@ -151,7 +151,7 @@ def get_latest_location(user_id: str):
     if location:
         return {"id": str(location[0]), "user_id": str(location[1]), "latitude": location[2], "longitude": location[3], "recorded_at": location[4]}
     else:
-        return {"message": "指定されたユーザーIDの位置情報が見つかりませんでした"}
+        raise HTTPException(status_code=404, detail="指定されたユーザーIDの位置情報が見つかりませんでした")
     
 @app.get("/locations/{user_id}/area")
 def get_location_area(user_id: str):
@@ -192,8 +192,8 @@ def get_location_area(user_id: str):
 
     # 取得した位置情報をレスポンスとして返す
     if area is None:
-        return {"message": "指定されたユーザーIDの位置情報が見つかりませんでした", "user_id": user_id}
-    
+        raise HTTPException(status_code=404, detail="指定されたユーザーIDの位置情報が見つかりませんでした")
+
     # エリア判定結果をレスポンスとして返す
     return {
         "user_id": str(area[0]),
