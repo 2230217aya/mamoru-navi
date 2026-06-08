@@ -28,7 +28,7 @@ class LocationRequest(BaseModel):
 def convert_crowd_level(current_user_count: int, capacity: int):
     # capacityが0の場合はcrowd_levelを「unknown」とする
     if capacity is None or capacity <= 0:
-        return "unknown"
+        return None, "unknown"
     # 混雑度を計算する
     crowd_rate = current_user_count / capacity
     # 混雑度に応じてcrowd_levelを判定する
