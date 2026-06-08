@@ -308,6 +308,10 @@ DELETE /locations/old
 | 80% 〜 99% | 混雑   |
 | 100%以上    | 満員   |
 
+| 条件 | crowd_rate | crowd_level |
+| --- | --- | --- |
+| capacity が 0 または未設定 | null | unknown |
+
 
 ## 関連仕様書
 
