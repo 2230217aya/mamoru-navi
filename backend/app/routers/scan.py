@@ -247,4 +247,43 @@ def sync_offline_data(request: SyncRequest):
         raise HTTPException(status_code=500, detail="データベースの同期処理に失敗しました")
     finally:
         cur.close()
-        conn.close()      
+        conn.close()     
+
+
+@router.get("/users/download", summary="住民リストの差分ダウンロード(オフライン用)")
+def download_users_for_offline(updated_at: Optional[str] = None):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        # クエリを動的に変更
+        if updated_at:
+            # 最後に取得した時刻よりも新しいデータだけを検索
+            query = """
+                SELECT user_id, name, gender, blood_type, medical_conditions, phone_number, created_at AS updated_at
+                FROM users
+                WHERE created_at > %s::timestamp;
+            """
+            cur.execute(query, (updated_at,))
+        else:
+            # updated_at がなければ全件取得（初回用）
+            cur.execute("""
+                SELECT user_id, name, gender, blood_type, medical_conditions, phone_number, created_at AS updated_at 
+                FROM users;
+            """)
+            
+        users = cur.fetchall()
+
+        return {
+            "status": "success",
+            "count": len(users),
+            "users": users
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()    
+
+
+ 
