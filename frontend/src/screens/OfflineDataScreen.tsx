@@ -38,63 +38,6 @@ export default function OfflineDataScreen() {
   const [pendingCount, setPendingCount] = useState(0); // ★ 未送信データの件数
   const [isSyncing, setIsSyncing] = useState(false); // ★手動同期中のボタン無効化用
 
-  // 画面を開いた時や定期的に未送信件数を更新
-  useEffect(() => {
-    const fetchCount = async () => {
-      // 件数表示用なので制限なしで全件取得
-      const items = await LocalDB.getPendingSyncs(1000);
-      setPendingCount(items ? items.length : 0);
-    };
-    fetchCount();
-    // 5秒ごとに画面の件数を自動更新する
-    const interval = setInterval(fetchCount, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ★ 手動同期ボタンの処理
-  const handleManualSync = async () => {
-    if (pendingCount === 0) return;
-
-    setIsSyncing(true);
-    let totalSynced = 0;
-
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-    const baseUrl = process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-
-    try {
-      // 溜まっているデータがなくなるまで、5件ずつ送るループ
-      while (true) {
-        const pendingItems = await LocalDB.getPendingSyncs(5);
-        if (!pendingItems || pendingItems.length === 0) break; // 全部送り終わった
-
-        const result = await LocalDB.syncWithServer(baseUrl, pendingItems);
-
-        if (result.success) {
-          totalSynced += result.count;
-          setPendingCount((prev) => Math.max(0, prev - result.count)); // 画面の数字を減らす
-        } else {
-          Alert.alert(
-            "通信エラー",
-            "同期中に通信が途絶えました。残りは後で送信します。",
-          );
-          break; // エラーが起きたらループを止める
-        }
-      }
-
-      if (totalSynced > 0) {
-        Alert.alert(
-          "手動同期完了",
-          `${totalSynced}件のデータをサーバーに送信しました！`,
-        );
-      }
-    } catch (e) {
-      Alert.alert("エラー", "同期処理に失敗しました");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>オフラインデータ管理</Text>
@@ -124,19 +67,6 @@ export default function OfflineDataScreen() {
               />
             </View>
           </View>
-
-          <TouchableOpacity
-            style={[
-              styles.updateButton,
-              !mapData.downloaded && styles.disabledButton,
-            ]} // 未ダウンロード時はグレーアウト
-            onPress={() => handleUpdate("地図データ")}
-            disabled={mapData.downloaded} // ダウンロード済みならボタン無効化
-          >
-            <Text style={styles.updateButtonText}>
-              {mapData.downloaded ? "更新済み" : "ダウンロード"}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* 避難所リストセクション */}
@@ -178,28 +108,6 @@ export default function OfflineDataScreen() {
           >
             <Text style={styles.updateButtonText}>
               {shelterListData.downloaded ? "更新済み" : "ダウンロード"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* ★ ここから追加：同期実行ボタン ★ */}
-          <TouchableOpacity
-            style={[
-              styles.downloadButton,
-              {
-                backgroundColor: pendingCount > 0 ? "#3b82f6" : "#D1D5DB",
-                marginTop: 10,
-              },
-            ]}
-            onPress={handleManualSync}
-            disabled={pendingCount === 0} // 0件の時は押せないようにする
-          >
-            <Text
-              style={[
-                styles.downloadButtonText,
-                { color: pendingCount > 0 ? "#fff" : "#6B7280" },
-              ]}
-            >
-              未送信の受付データを同期する ({pendingCount}件)
             </Text>
           </TouchableOpacity>
         </View>

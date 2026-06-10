@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS shelters (
 INSERT INTO shelters (
     shelter_id, name, address, latitude, longitude, capacity
 ) VALUES (
-    '123e4567-e89b-12d3-a456-426614174001',
+    '123e4567-e89b-12d3-a456-426614174000',
     '中央市民体育館（避難所）',
     '大阪市北区中崎西2丁目3-35',
     34.7056,

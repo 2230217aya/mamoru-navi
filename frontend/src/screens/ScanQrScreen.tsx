@@ -20,7 +20,7 @@ export default function ScanQRScreen() {
   const [scanned, setScanned] = useState(false);
 
   const STAFF_CONFIG = {
-    location_id: "123e4567-e89b-12d3-a456-426614174001",
+    location_id: "123e4567-e89b-12d3-a456-426614174000",
     scan_mode: "shelter",
   };
 
@@ -103,6 +103,9 @@ export default function ScanQRScreen() {
         const userId = data.replace("mamoru_navi_user:", "");
         const now = new Date().toISOString();
 
+        // 1. users_cache から、この UUID の人を検索する
+        const cachedUser = await LocalDB.getUserCache(userId);
+
         // checkinsテーブルに保存
         await LocalDB.saveCheckin({
           checkin_id: checkinId,
@@ -124,22 +127,32 @@ export default function ScanQRScreen() {
           }),
         );
 
-        // 3. オフライン用の結果データを擬似的に作成して結果画面へ
+        // 3. 結果画面に渡すデータを組み立てる
         const offlineResult = {
-          status: "offline", // ステータスを offline にする
-          message:
-            "オフラインのため、端末内に保存しました。通信復旧後に同期されます。",
-          user_info: {
-            user_id: userId,
-            name: "（オフラインのため取得不可）",
-            blood_type: "不明",
-            medical_conditions: "不明",
-            phone_number: "不明",
-          },
+          status: "offline",
+          message: "オフライン保存完了。端末内データを使用しました。",
+          user_info: cachedUser
+            ? {
+                // ★ キャッシュがあれば、その人の名前や持病を入れる！
+                user_id: cachedUser.user_id,
+                name: cachedUser.name,
+                gender: cachedUser.gender,
+                blood_type: cachedUser.blood_type,
+                medical_conditions: cachedUser.medical_conditions,
+                phone_number: cachedUser.phone_number,
+              }
+            : {
+                // もし事前にダウンロードしていない住民だった場合のみ、(取得不可)にする
+                user_id: userId,
+                name: "（未登録住民：名簿にありません）",
+                blood_type: "不明",
+                medical_conditions: "不明",
+                phone_number: "不明",
+              },
           action_result: {
             type: "shelter_checkin",
             success: true,
-            detail: "ローカル保存完了。通信復旧後に自動同期されます。",
+            detail: "ローカルDBで照合に成功しました。",
           },
         };
 
