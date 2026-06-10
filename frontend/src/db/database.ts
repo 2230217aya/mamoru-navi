@@ -39,6 +39,19 @@ export class LocalDB {
         );
       `);
 
+      // 3. users_cache テーブルの作成 (事前ダウンロードした住民データ)
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS users_cache (
+          user_id TEXT PRIMARY KEY NOT NULL,
+          name TEXT,
+          gender TEXT,
+          blood_type TEXT,
+          medical_conditions TEXT,
+          phone_number TEXT,
+          updated_at TEXT
+        );
+      `);
+
       // await this.db.execAsync("DELETE FROM sync_queue;");
       // await this.db.execAsync("DELETE FROM checkins;");
       // console.log("🧹 データベースのゴミデータを強制消去しました！");
@@ -164,5 +177,52 @@ export class LocalDB {
       console.error("同期失敗:", error);
       return { success: false, count: 0, message: "同期に失敗しました" };
     }
+  }
+
+  // --- 事前ダウンロード用メソッド ---
+
+  // 複数の住民データを一気に保存する
+  static async saveUsersCache(users: any[]) {
+    const db = await this.init();
+    const now = new Date().toISOString();
+
+    // トランザクションを使って高速に一括保存
+    await db?.withTransactionAsync(async () => {
+      for (const user of users) {
+        // すでに同じIDがあれば上書き(REPLACE)する
+        await db.runAsync(
+          `INSERT OR REPLACE INTO users_cache 
+           (user_id, name, gender, blood_type, medical_conditions, phone_number, updated_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?);`,
+          [
+            user.user_id,
+            user.name,
+            user.gender,
+            user.blood_type,
+            user.medical_conditions,
+            user.phone_number,
+            now,
+          ],
+        );
+      }
+    });
+  }
+
+  // 手元にある住民データの中で、最新の更新日時を取得する
+  static async getLatestUserUpdateAt() {
+    const db = await this.init();
+    const result: any = await db?.getFirstAsync(
+      "SELECT MAX(updated_at) as last_update FROM users_cache;",
+    );
+    return result?.last_update || null; // データが1件もなければ null を返す
+  }
+
+  // オフラインスキャン時にUUIDから住民を検索する
+  static async getUserCache(user_id: string) {
+    const db = await this.init();
+    return await db?.getFirstAsync(
+      "SELECT * FROM users_cache WHERE user_id = ?;",
+      [user_id],
+    );
   }
 }

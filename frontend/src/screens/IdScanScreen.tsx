@@ -24,7 +24,7 @@ export default function IDScanScreen() {
 
   // 職員用設定 (本来は設定画面やDBから取得)
   const STAFF_CONFIG = {
-    location_id: "123e4567-e89b-12d3-a456-426614174001",
+    location_id: "123e4567-e89b-12d3-a456-426614174000",
     scan_mode: "shelter",
   };
 
