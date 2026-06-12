@@ -20,6 +20,14 @@ export default function HomeScreen() {
       >
         <Text style={styles.buttonText}>マイページへ</Text>
       </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.button}
+        // ★ app/user-home.tsx が存在するので、このパスでOK ★
+        onPress={() => router.push('./user_home')} 
+      >
+        <Text style={styles.buttonText}>ユーザーホームページへ</Text>
+      </TouchableOpacity>
+
 
       <TouchableOpacity 
         style={styles.button}

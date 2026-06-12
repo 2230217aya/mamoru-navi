@@ -1,9 +1,9 @@
 // frontend/app/offline-data.tsx
 import React from 'react';
-import OfflineDataScreen from '../src/screens/OfflineDataSection';
+import AddAreaScreen from '../src/screens/AddAreaScreen';
 import { useRouter } from 'expo-router';
 
-export default function OfflineDataScreenWrapped() { // 関数名を分けることで、元のコンポーネントと区別
+export default function AddAreaScreenWrapped() { // 関数名を分けることで、元のコンポーネントと区別
   const router = useRouter();
   
   // navigation prop が不要な場合は空でOK、あるいは goBack だけ定義
@@ -11,5 +11,5 @@ export default function OfflineDataScreenWrapped() { // 関数名を分けるこ
     goBack: () => router.back(),
   };
 
-  return <OfflineDataScreen />; // UIコンポーネントをそのまま render
+  return <AddAreaScreen />; // UIコンポーネントをそのまま render
 }

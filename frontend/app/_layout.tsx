@@ -94,7 +94,7 @@ export default function RootLayout() {
         animation: "slide_from_right",
       })}
       // ★★★ アプリ起動時に最初に表示する画面を "index" に指定 ★★★
-      initialRouteName="index"
+      initialRouteName="user_home"
     >
       {/* 
         ここに、アプリを構成する画面（ファイル名）を登録します。
@@ -112,6 +112,10 @@ export default function RootLayout() {
       <Stack.Screen name="scan-qr" options={{ title: "QRコードスキャン" }} />
       <Stack.Screen name="scan-result" options={{ title: "受付結果" }} />
       <Stack.Screen name="id-scan" options={{ title: "身分証明書スキャン" }} />
+      <Stack.Screen name="index"  options={{ title: '仮ホーム' }} />
+      <Stack.Screen name="user_home"  options={{ title: 'ホーム' }} />
+      
     </Stack>
+    
   );
 }
