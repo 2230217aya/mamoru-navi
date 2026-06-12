@@ -14,9 +14,11 @@ import {
 } from 'react-native';
 
 export default function SafetyScreen() {
+    // オフラインデータの充実度（安心度）
     const [safetyPercent, setSafetyPercent] =
   useState(100);
 
+ // 安心度に応じた表示内容を取得
 
 const getSafetyStatus = () => {
 
@@ -53,6 +55,7 @@ const safetyStatus = getSafetyStatus();
       <ScrollView showsVerticalScrollIndicator={false}>
       
       {/* Header */}
+      {/* メニュー画面へ戻るボタン */}
       <TouchableOpacity
         style={styles.header}
         onPress={() => router.push('../user_home')}
@@ -61,12 +64,12 @@ const safetyStatus = getSafetyStatus();
         <View style={styles.redDot} />
         </TouchableOpacity>
 
-      {/* 安心度 */}
+      {/* オフラインデータの安心度 */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>現在の安心度</Text>
 
         <View style={styles.safetyContent}>
-          
+           {/* 安心度ステータス表示 */}
           <View style={styles.statusRow}>
             <View style={styles.topStatusRow}>
                 <View
@@ -94,7 +97,7 @@ const safetyStatus = getSafetyStatus();
                 {safetyStatus.Contents}
             </Text>
             </View>
-
+          {/* 安心度ゲージ */}
           <AnimatedCircularProgress
             size={120}
             width={8}
@@ -131,7 +134,7 @@ const safetyStatus = getSafetyStatus();
             </AnimatedCircularProgress>
 
         </View>
-
+        {/* 最新データ一括ダウンロード */}
         <TouchableOpacity style={styles.downloadButton}>
           <Text style={styles.downloadText}>
             最新データを一括ダウンロード
@@ -139,11 +142,11 @@ const safetyStatus = getSafetyStatus();
         </TouchableOpacity>
       </View>
 
-      {/* マイエリア */}
+      {/* マイエリア管理 */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>マイエリア設定</Text>
-
+            {/* エリア追加画面へ遷移 */}
            <TouchableOpacity
             style={styles.addButton}
             onPress={() =>
@@ -155,7 +158,7 @@ const safetyStatus = getSafetyStatus();
             </Text>
           </TouchableOpacity>
         </View>
-
+        {/* 登録済みエリア一覧 */}
         <TouchableOpacity style={styles.areaButton}>
           <Text style={styles.areaText}>
             🏠 自宅周辺（半径3 km）
@@ -174,13 +177,12 @@ const safetyStatus = getSafetyStatus();
           </Text>
         </TouchableOpacity>
       </View>
-
-      {/* データ */}
+      {/* オフラインデータ情報 */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>データの内訳と容量</Text>
 
         <Text style={styles.smallTitle}>基本地図データ</Text>
-
+          {/* 保存済みデータ一覧 */}
         <View style={styles.dataRow}>
           
           <View>
@@ -196,7 +198,7 @@ const safetyStatus = getSafetyStatus();
               土砂災害ハザードマップ
             </Text>
           </View>
-
+          {/* ストレージ使用状況 */}
           <View style={styles.storageBox}>
             <Text style={styles.storageSub}>
               このアプリが使用中の容量
@@ -214,7 +216,7 @@ const safetyStatus = getSafetyStatus();
         </View>
       </View>
 
-      {/* 自動更新 */}
+      {/* 自動更新設定 */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
           <View>
@@ -226,7 +228,7 @@ const safetyStatus = getSafetyStatus();
               （スマート・キャッシュ）
             </Text>
           </View>
-
+          {/* スマートキャッシュ機能 ON/OFF */}
           <Switch
             value={true}
             trackColor={{
@@ -238,7 +240,7 @@ const safetyStatus = getSafetyStatus();
             }
             />
         </View>
-
+        {/* 自動更新の説明 */}
         <Text style={styles.updateText}>
           Wi-Fi接続時に自動で最新データを更新する
         </Text>

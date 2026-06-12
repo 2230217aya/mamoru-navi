@@ -14,6 +14,7 @@ import {
 
 export default function AddArea() {
 
+  // 地図の初期表示位置
   const [region, setRegion] = useState({
     latitude: 34.7055,
     longitude: 135.4983,
@@ -21,25 +22,32 @@ export default function AddArea() {
     longitudeDelta: 0.01,
   });
 
+  // 選択中の通知範囲
   const [selectedRadius, setSelectedRadius] =
     useState(3);
 
+  // エリア表示名
   const [areaName, setAreaName] =
     useState('');
 
+  // 郵便番号
   const [postCode, setPostCode] =
     useState('530-0015');
 
+  // 都道府県
   const [prefecture, setPrefecture] =
     useState('大阪府');
 
+  // 市区町村
   const [city, setCity] = useState(
     '大阪市北区中崎西',
   );
 
+  // 番地・建物名
   const [street, setStreet] =
     useState('２丁目３－３５');
 
+  // 選択可能な通知範囲
   const radiusOptions = [1, 3, 5];
 
   return (
@@ -50,32 +58,32 @@ export default function AddArea() {
       }
       showsVerticalScrollIndicator={false}
     >
-      {/* Title */}
+      {/* 画面タイトル */}
       <Text style={styles.title}>
         新しいエリアを追加
       </Text>
 
       <View style={styles.card}>
 
-        {/* Name */}
+        {/* エリア名入力 */}
         <View style={styles.nameBox}>
-        <Text style={styles.icon}>
-          🏠
-        </Text>
+          <Text style={styles.icon}>
+            🏠
+          </Text>
 
-        <TextInput
-          value={areaName}
-          onChangeText={setAreaName}
-          placeholder="表示名を入力"
-          placeholderTextColor="#888"
-          style={styles.nameLabel}
-        />
-      </View>
+          <TextInput
+            value={areaName}
+            onChangeText={setAreaName}
+            placeholder="表示名を入力"
+            placeholderTextColor="#888"
+            style={styles.nameLabel}
+          />
+        </View>
 
-        {/* Address */}
+        {/* 住所入力エリア */}
         <View style={styles.addressBox}>
-          
-          {/* PostCode */}
+
+          {/* 郵便番号 */}
           <View style={styles.addressTop}>
             <Text style={styles.addressLabel}>
               住所：
@@ -86,10 +94,10 @@ export default function AddArea() {
               onChangeText={setPostCode}
               style={styles.postCode}
             />
-            
+
           </View>
 
-          {/* Prefecture + City */}
+          {/* 都道府県・市区町村 */}
           <View style={styles.addressRow}>
             <TextInput
               value={prefecture}
@@ -110,7 +118,7 @@ export default function AddArea() {
             />
           </View>
 
-          {/* Street */}
+          {/* 番地・建物名 */}
           <TextInput
             value={street}
             onChangeText={setStreet}
@@ -118,15 +126,16 @@ export default function AddArea() {
           />
         </View>
 
-        {/* Map */}
+        {/* 地図表示 */}
         <MapView
           style={styles.map}
           region={region}
         >
+          {/* 選択地点マーカー */}
           <Marker coordinate={region} />
         </MapView>
 
-        {/* Radius */}
+        {/* 通知範囲設定 */}
         <Text style={styles.rangeTitle}>
           範囲
         </Text>
@@ -144,6 +153,7 @@ export default function AddArea() {
               setSelectedRadius(radius)
             }
           >
+            {/* ラジオボタン */}
             <View
               style={styles.radioOuter}
             >
@@ -157,6 +167,7 @@ export default function AddArea() {
               )}
             </View>
 
+            {/* 範囲表示 */}
             <Text style={styles.radiusText}>
               {radius} km
               {radius === 3 &&
@@ -165,7 +176,7 @@ export default function AddArea() {
           </TouchableOpacity>
         ))}
 
-        {/* Add Button */}
+        {/* エリア追加ボタン */}
         <TouchableOpacity
           style={styles.addButton}
         >
