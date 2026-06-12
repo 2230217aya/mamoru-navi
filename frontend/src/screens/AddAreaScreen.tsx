@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import MapView, {
   Marker,
 } from 'react-native-maps';
-
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 export default function AddArea() {
-
+  const navigation = useNavigation();
   // 地図の初期表示位置
   const [region, setRegion] = useState({
     latitude: 34.7055,
@@ -58,6 +58,7 @@ export default function AddArea() {
       }
       showsVerticalScrollIndicator={false}
     >
+
       {/* 画面タイトル */}
       <Text style={styles.title}>
         新しいエリアを追加
@@ -186,8 +187,18 @@ export default function AddArea() {
             追加
           </Text>
         </TouchableOpacity>
+              {/* もとるボダン */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backButtonText}>
+          戻る
+        </Text>
+      </TouchableOpacity>
 
       </View>
+      
     </ScrollView>
   );
 }
@@ -204,6 +215,14 @@ const styles = StyleSheet.create({
    
 
     flexGrow: 1,
+  },
+  backButton: {
+    marginTop: 5,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
   },
 
   title: {
@@ -337,14 +356,14 @@ icon: {
     borderRadius: 12,
     overflow: 'hidden',
 
-    marginBottom: 18,
+    marginBottom: 15,
   },
 
   rangeTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
 
-    marginBottom: 14,
+    marginBottom: 12,
 
     color: '#111',
   },
@@ -403,7 +422,7 @@ icon: {
   addButton: {
     backgroundColor: '#ffe11a',
 
-    marginTop: 20,
+    marginTop: 5,
 
     borderRadius: 999,
 
