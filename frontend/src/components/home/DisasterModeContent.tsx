@@ -6,8 +6,11 @@ type Props = {
 };
 
 export default function DisasterModeContent({ expanded }: Props) {
+  // 展開されていない場合は何も表示しない
   if (!expanded) return null;
- const shelterData = {
+
+  // 避難所情報（ダミーデータ）
+  const shelterData = {
     capacity: 50,
 
     toilet: {
@@ -16,8 +19,10 @@ export default function DisasterModeContent({ expanded }: Props) {
       female: 5,
     },
 
+    // 入浴施設の有無
     bath: true,
 
+    // 備蓄物資の状況
     supplies: [
       {
         name: '飲料水',
@@ -38,10 +43,10 @@ export default function DisasterModeContent({ expanded }: Props) {
     ],
   };
 
- return (
+  return (
     <View style={styles.container}>
 
-      {/* 最大收容人数 */}
+      {/* 最大収容人数表示 */}
       <View style={styles.row}>
         <Text style={styles.label}>
           最大収容人数
@@ -52,7 +57,7 @@ export default function DisasterModeContent({ expanded }: Props) {
         </Text>
       </View>
 
-      {/* トイレ */}
+      {/* トイレ設備情報表示 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           トイレ
@@ -67,7 +72,7 @@ export default function DisasterModeContent({ expanded }: Props) {
         </Text>
       </View>
 
-      {/* 入浴施設 */}
+      {/* 入浴施設の有無表示 */}
       <View style={styles.row}>
         <Text style={styles.label}>
           入浴施設
@@ -85,7 +90,7 @@ export default function DisasterModeContent({ expanded }: Props) {
         </Text>
       </View>
 
-      {/* 備蓄物資 */}
+      {/* 備蓄物資一覧表示 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           備蓄されている物資
@@ -96,10 +101,12 @@ export default function DisasterModeContent({ expanded }: Props) {
             key={index}
             style={styles.supplyRow}
           >
+            {/* 物資名 */}
             <Text style={styles.supplyName}>
               {item.name}
             </Text>
 
+            {/* 在庫状況 */}
             <Text
               style={[
                 styles.supplyStatus,

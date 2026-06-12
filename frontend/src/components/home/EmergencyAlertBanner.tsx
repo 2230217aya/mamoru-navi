@@ -6,19 +6,11 @@ import {
   View,
 } from 'react-native';
 
-// ===== Props =====
+// コンポーネントのProps定義
 type Props = {
-
-  // 標題
   title: string;
-
-  // 地區內容
   message: string;
-
-  // 左側數字
   level: string;
-
-  // 震度文字
   levelText: string;
 };
 
@@ -33,9 +25,10 @@ export default function EmergencyAlertBanner({
 
   return (
 
+    // 緊急地震速報バナー
     <View style={styles.container}>
 
-      {/* ===== 左側震度 ===== */}
+      {/* 震度表示エリア */}
       <View style={styles.levelBox}>
 
         <Text style={styles.levelNumber}>
@@ -44,20 +37,20 @@ export default function EmergencyAlertBanner({
 
       </View>
 
-      {/* ===== 右側內容 ===== */}
+      {/* 災害情報表示エリア */}
       <View style={styles.contentArea}>
 
-        {/* ===== 標題 ===== */}
+        {/* 災害情報タイトル */}
         <Text style={styles.title}>
           {title}
         </Text>
 
-        {/* ===== 地區 ===== */}
+        {/* 対象地域・メッセージ */}
         <Text style={styles.message}>
           {message}
         </Text>
 
-        {/* ===== 震度 ===== */}
+        {/* 震度情報 */}
         <Text style={styles.levelText}>
           {levelText}
         </Text>

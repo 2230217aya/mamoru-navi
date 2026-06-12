@@ -11,12 +11,14 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 
+// 窓口サービス情報
 type OfficeService = {
   id: number;
   title: string;
   number: string;
 };
 
+// コンポーネントのProps定義
 type Props = {
   officeServices: OfficeService[];
   loading: boolean;
@@ -34,6 +36,7 @@ export default function NormalModeContent({
   return (
     <>
 
+      {/* 営業時間・定休日表示 */}
       <View style={styles.infoRow}>
 
         <Text style={styles.cardText}>
@@ -46,6 +49,7 @@ export default function NormalModeContent({
 
       </View>
 
+      {/* 最終更新日時および更新ボタン */}
       <View style={styles.updateRow}>
 
         <Text style={styles.updateText}>
@@ -65,10 +69,12 @@ export default function NormalModeContent({
 
       </View>
 
+      {/* 窓口の呼び出し状況一覧 */}
       <View style={styles.serviceBox}>
 
         {loading ? (
 
+          // データ更新中
           <Text>更新中...</Text>
 
         ) : (
@@ -80,10 +86,12 @@ export default function NormalModeContent({
               style={styles.rowItem}
             >
 
+              {/* 窓口名 */}
               <Text style={styles.serviceTitle}>
                 {item.title}
               </Text>
 
+              {/* 現在の呼出番号 */}
               <Text style={styles.numberText}>
                 {item.number}番
               </Text>

@@ -78,10 +78,9 @@ export default function HomeBottomSheet({
         }}
       >
 
-        {/* ===== 外層 ===== */}
+
         <BottomSheetView style={styles.container}>
 
-          {/* ===== 標題 ===== */}
         <View style={styles.titleRow}>
 
           <Text style={styles.title}>
@@ -117,7 +116,7 @@ export default function HomeBottomSheet({
             />
           ) : (
             /* ========================= */
-            /* DISASTER MODE（可滾動） */
+            /* DISASTER MODE */
             /* ========================= */
 
             <BottomSheetScrollView
@@ -132,7 +131,7 @@ export default function HomeBottomSheet({
 
       </BottomSheet>
 
-      {/* ===== 底部固定統計 ===== */}
+
       {mode === MODES.DISASTER && (
         <View style={styles.fixedStatsContainer}>
 
