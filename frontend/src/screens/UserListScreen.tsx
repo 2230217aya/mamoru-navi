@@ -131,11 +131,18 @@ export default function userList() {
             <Image source={require('@/assets/images/dashboard-qrcode.png')} style={styles.qrcodeImage} />
         </Pressable>
 
-        {/* 避難所名 */}
-        <Text style={styles.shelter}>{shelterData.evacuationShelter}</Text>
+        <View style={styles.column}>
+          {/* 避難所名 */}
+          <Text style={styles.shelter}>{shelterData.evacuationShelter}</Text>
 
-        {/* 人数 */}
-        <Text style={styles.peoples}>人数：{shelterData.nowPeople}/{shelterData.maxPeople}</Text>
+          {/* 人数 */}
+          <Text style={styles.peoples}>人数：{shelterData.nowPeople}/{shelterData.maxPeople}</Text>
+        </View>
+
+        {/* 右上のアイコン */}
+        <Pressable onPress={() => router.push("/supplies-status")} style={styles.cardboardImageButton}>
+            <Image source={require('@/assets/images/userList-cardboard.png')} style={styles.cardboardImage} />
+        </Pressable>
       </View>
 
       {/* ボディ部分 */}
@@ -213,9 +220,22 @@ const styles = StyleSheet.create({
   // 人数
   peoples: {
     fontSize: 20,
+    // position: 'absolute',
+    // right: 10,
+    // marginTop: 10,
+  },
+  column: {
+    flexDirection: 'column',
+  },
+  cardboardImageButton: {
     position: 'absolute',
+    top: 50,
     right: 10,
-    marginTop: 10,
+    zIndex: 10,
+  },
+  cardboardImage: {
+    width: 60,
+    height: 60,
   },
 
   // 上の名前 性別とかのやつ
