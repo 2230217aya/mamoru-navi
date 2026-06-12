@@ -50,6 +50,10 @@ def convert_crowd_level(current_user_count: int, capacity: int):
 def read_root():
     return {"message": "まもるナビ APIへようこそ！"}
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "バックエンドは動いています"}
+
 @app.post("/locations/")
 def receive_location(location: LocationRequest):
     conn = get_db_connection()
