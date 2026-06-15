@@ -108,3 +108,26 @@ def get_location_info(lat: float, lng: float):
                     for a in danger_areas
                 ]
             }
+        
+@router.get("/offline", summary="オフライン用マップデータを取得")
+def get_offline_map_data():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT shelter_id, name, address, latitude, longitude, capacity, update_at
+                FROM shelters ORDER BY name
+            """)
+            shelters = cur.fetchall()
+            shelter_list = [
+                {
+                    "shelter_id": str(s[0]),
+                    "name": s[1],
+                    "address": s[2],
+                    "latitude": s[3],
+                    "longitude": s[4],
+                    "capacity": s[5],
+                    "updated_at": str(s[6]) if s[6] else None
+                }
+                for s in shelters
+            ]
+            return {"count": len(shelter_list), "shelters": shelter_list}

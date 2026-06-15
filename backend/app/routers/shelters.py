@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
+from config import OLD_LOCATION_STALE_MINUTES
 
 router = APIRouter(
     prefix="/shelters",
@@ -9,6 +10,19 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+def convert_crowd_level(current_user_count: int, capacity: int):
+    if capacity is None or capacity <= 0:
+        return None, "unknown"
+    crowd_rate = current_user_count / capacity
+    if crowd_rate < 0.5:
+        crowd_level = "空きあり"
+    elif crowd_rate < 0.8:
+        crowd_level = "やや混雑"
+    elif crowd_rate < 1.0:
+        crowd_level = "混雑"
+    else:
+        crowd_level = "満員"
+    return round(crowd_rate, 2), crowd_level
 # ===== SCHEMA =====
 
 class ShelterCreate(BaseModel):
@@ -125,3 +139,83 @@ def get_shelter(shelter_id: str):
                 "longitude": s[4],
                 "capacity": s[5]
             }
+        
+@router.get("/crowd-counts", summary="各避難所の混雑状況を取得")
+def get_shelter_crowd_counts():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                WITH latest_locations AS (
+                    SELECT DISTINCT ON (user_id)
+                        user_id, location, recorded_at
+                    FROM user_locations
+                    WHERE recorded_at >= NOW() - (%s * INTERVAL '1 minute')
+                    ORDER BY user_id, recorded_at DESC
+                )
+                SELECT
+                    s.shelter_id, s.name, s.capacity,
+                    COUNT(ll.user_id) AS current_user_count
+                FROM shelters s
+                LEFT JOIN latest_locations ll
+                    ON ST_DWithin(
+                        ll.location::geography,
+                        ST_SetSRID(ST_MakePoint(s.longitude, s.latitude), 4326)::geography,
+                        500
+                    )
+                GROUP BY s.shelter_id, s.name, s.capacity
+                ORDER BY s.name
+            """, (OLD_LOCATION_STALE_MINUTES,))
+            rows = cur.fetchall()
+            results = []
+            for row in rows:
+                crowd_rate, crowd_level = convert_crowd_level(row[3], row[2])
+                results.append({
+                    "shelter_id": str(row[0]),
+                    "shelter_name": row[1],
+                    "capacity": row[2],
+                    "current_user_count": row[3],
+                    "crowd_rate": crowd_rate,
+                    "crowd_level": crowd_level
+                })
+            return {"crowd_counts": results}
+
+@router.get("/heatmap", summary="ヒートマップ用データを取得")
+def get_shelter_heatmap_data():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                WITH latest_locations AS (
+                    SELECT DISTINCT ON (user_id)
+                        user_id, location, recorded_at
+                    FROM user_locations
+                    WHERE recorded_at >= NOW() - (%s * INTERVAL '1 minute')
+                    ORDER BY user_id, recorded_at DESC
+                )
+                SELECT
+                    s.shelter_id, s.name, s.latitude, s.longitude, s.capacity,
+                    COUNT(ll.user_id) AS current_user_count
+                FROM shelters s
+                LEFT JOIN latest_locations ll
+                    ON ST_DWithin(
+                        ll.location::geography,
+                        ST_SetSRID(ST_MakePoint(s.longitude, s.latitude), 4326)::geography,
+                        500
+                    )
+                GROUP BY s.shelter_id, s.name, s.latitude, s.longitude, s.capacity
+                ORDER BY s.name
+            """, (OLD_LOCATION_STALE_MINUTES,))
+            rows = cur.fetchall()
+            heatmap_data = []
+            for row in rows:
+                crowd_rate, crowd_level = convert_crowd_level(row[5], row[4])
+                heatmap_data.append({
+                    "shelter_id": str(row[0]),
+                    "shelter_name": row[1],
+                    "latitude": row[2],
+                    "longitude": row[3],
+                    "capacity": row[4],
+                    "current_user_count": row[5],
+                    "crowd_rate": crowd_rate,
+                    "crowd_level": crowd_level
+                })
+            return {"heatmap_data": heatmap_data}

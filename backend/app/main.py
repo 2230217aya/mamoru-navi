@@ -28,3 +28,7 @@ app.include_router(facilities.router)
 @app.get("/")
 def read_root():
     return {"message": "まもるナビ APIへようこそ！"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "バックエンドは動いています"}

@@ -4,8 +4,7 @@ from typing import Optional
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import Point
 from database import get_db
-
-OLD_LOCATION_STALE_MINUTES = 5
+from config import OLD_LOCATION_STALE_MINUTES
 
 router = APIRouter(
     prefix="/user-locations",
