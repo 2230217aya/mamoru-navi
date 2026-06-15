@@ -53,50 +53,6 @@ def get_shelters():
                 }
                 for s in shelters
             ]
-
-@router.get("/search", summary="シェルターを名前または容量で検索")
-def search_shelters(q: Optional[str] = None, capacity: Optional[int] = None):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            query = "SELECT shelter_id, name, address, capacity FROM shelters WHERE 1=1"
-            params = []
-            if q:
-                query += " AND name ILIKE %s"
-                params.append(f"%{q}%")
-            if capacity:
-                query += " AND capacity >= %s"
-                params.append(capacity)
-            cur.execute(query, params)
-            shelters = cur.fetchall()
-            return [
-                {
-                    "shelter_id": str(s[0]),
-                    "name": s[1],
-                    "address": s[2],
-                    "capacity": s[3]
-                }
-                for s in shelters
-            ]
-
-@router.get("/{shelter_id}", summary="IDでシェルターを取得")
-def get_shelter(shelter_id: str):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT shelter_id, name, address, latitude, longitude, capacity
-                FROM shelters WHERE shelter_id = %s
-            """, (shelter_id,))
-            s = cur.fetchone()
-            if not s:
-                raise HTTPException(status_code=404, detail="シェルターが見つかりません!")
-            return {
-                "shelter_id": str(s[0]),
-                "name": s[1],
-                "address": s[2],
-                "latitude": s[3],
-                "longitude": s[4],
-                "capacity": s[5]
-            }
         
 @router.get("/nearest", summary="最寄りの避難所を取得")
 def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
@@ -124,3 +80,48 @@ def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
                 }
                 for s in shelters
             ]
+
+@router.get("/search", summary="シェルターを名前または容量で検索")
+def search_shelters(q: Optional[str] = None, capacity: Optional[int] = None):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            query = "SELECT shelter_id, name, address, capacity FROM shelters WHERE 1=1"
+            params = []
+            if q:
+                query += " AND name ILIKE %s"
+                params.append(f"%{q}%")
+            if capacity:
+                query += " AND capacity >= %s"
+                params.append(capacity)
+            cur.execute(query, params)
+            shelters = cur.fetchall()
+            return [
+                {
+                    "shelter_id": str(s[0]),
+                    "name": s[1],
+                    "address": s[2],
+                    "capacity": s[3]
+                }
+                for s in shelters
+            ]
+        
+
+@router.get("/{shelter_id}", summary="IDでシェルターを取得")
+def get_shelter(shelter_id: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT shelter_id, name, address, latitude, longitude, capacity
+                FROM shelters WHERE shelter_id = %s
+            """, (shelter_id,))
+            s = cur.fetchone()
+            if not s:
+                raise HTTPException(status_code=404, detail="シェルターが見つかりません!")
+            return {
+                "shelter_id": str(s[0]),
+                "name": s[1],
+                "address": s[2],
+                "latitude": s[3],
+                "longitude": s[4],
+                "capacity": s[5]
+            }
