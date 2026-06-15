@@ -28,9 +28,19 @@ export default function ScanResultScreen() {
 
   // ★ モード判定: 避難所チェックイン（災害時）かどうかを判定
   const isEmergencyMode = action.type === "shelter_checkin";
+  const isOffline = data.status === "offline";
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ★ ここから追加：オフライン時にのみ表示される警告バー ★ */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            ⚠️ オフラインモード: 端末内に保存されました
+          </Text>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>受付結果</Text>
 
@@ -158,4 +168,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backButtonText: { fontSize: 16, fontWeight: "600", color: "#4B5563" },
+  offlineBanner: {
+    backgroundColor: "#F59E0B", // 警告を示すオレンジ色
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  offlineBannerText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
+    textAlign: "center",
+  },
 });
