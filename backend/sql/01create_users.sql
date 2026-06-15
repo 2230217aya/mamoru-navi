@@ -13,14 +13,16 @@ CREATE TABLE IF NOT EXISTS users (
     address TEXT NOT NULL,
     home_location GEOMETRY NOT NULL,
     user_role VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 固定テストユーザー「テストユーザー太郎」のデータ挿入
 -- 既に存在する場合は無視する（エラーにならないようにする）ためのON CONFLICT
 INSERT INTO users (
     user_id, name, gender, birthday, blood_type, medical_conditions, 
-    phone_number, email, address, home_location, user_role
+    phone_number, email, address, home_location, user_role,
+    created_at 
 ) VALUES (
     '123e4567-e89b-12d3-a456-426614174000', 
     'テストユーザー太郎', 
@@ -32,6 +34,7 @@ INSERT INTO users (
     'test@example.com', 
     '東京都渋谷区〇〇', 
     ST_SetSRID(ST_MakePoint(139.700571, 35.658099), 4326), -- 渋谷駅の座標
-    'user'
+    'user',
+    CURRENT_TIMESTAMP
 )
 ON CONFLICT (user_id) DO NOTHING;
