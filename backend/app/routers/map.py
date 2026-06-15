@@ -13,13 +13,25 @@ router = APIRouter(
 def get_map():
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT shelter_id, name, address, latitude, longitude, capacity FROM shelters")
+            cur.execute("""
+                SELECT s.shelter_id, s.name, s.address, s.latitude, s.longitude, s.capacity,
+                       c.status, c.current_count
+                FROM shelters s
+                LEFT JOIN (
+                    SELECT DISTINCT ON (shelter_id)
+                        shelter_id, status, current_count
+                    FROM congestion_snapshots
+                    ORDER BY shelter_id, captured_at DESC
+                ) c ON s.shelter_id = c.shelter_id
+            """)
             shelters = cur.fetchall()
+
             cur.execute("""
                 SELECT area_id, risk_type, risk_level, description, is_active
                 FROM danger_areas WHERE is_active = TRUE
             """)
             danger_areas = cur.fetchall()
+
             return {
                 "shelters": [
                     {
@@ -28,7 +40,9 @@ def get_map():
                         "address": s[2],
                         "latitude": s[3],
                         "longitude": s[4],
-                        "capacity": s[5]
+                        "capacity": s[5],
+                        "congestion_status": s[6],
+                        "current_count": s[7]
                     }
                     for s in shelters
                 ],
@@ -48,11 +62,24 @@ def get_map():
 def get_location_info(lat: float, lng: float):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT shelter_id, name, address, latitude, longitude, capacity FROM shelters")
+            cur.execute("""
+                SELECT s.shelter_id, s.name, s.address, s.latitude, s.longitude, s.capacity,
+                       c.status, c.current_count
+                FROM shelters s
+                LEFT JOIN (
+                    SELECT DISTINCT ON (shelter_id)
+                        shelter_id, status, current_count
+                    FROM congestion_snapshots
+                    ORDER BY shelter_id, captured_at DESC
+                ) c ON s.shelter_id = c.shelter_id
+            """)
             shelters = cur.fetchall()
             nearest = min(shelters, key=lambda s: abs(s[3] - lat) + abs(s[4] - lng), default=None)
 
-            cur.execute("SELECT area_id, risk_type, risk_level, description FROM danger_areas WHERE is_active = TRUE")
+            cur.execute("""
+                SELECT area_id, risk_type, risk_level, description
+                FROM danger_areas WHERE is_active = TRUE
+            """)
             danger_areas = cur.fetchall()
 
             return {
@@ -65,7 +92,9 @@ def get_location_info(lat: float, lng: float):
                         "address": nearest[2],
                         "latitude": nearest[3],
                         "longitude": nearest[4],
-                        "capacity": nearest[5]
+                        "capacity": nearest[5],
+                        "congestion_status": nearest[6],
+                        "current_count": nearest[7]
                     }
                     if nearest else None
                 ),

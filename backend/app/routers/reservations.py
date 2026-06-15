@@ -13,7 +13,7 @@ router = APIRouter(
 # ===== SCHEMA =====
 
 class ReservationCreate(BaseModel):
-    shelter_id: str
+    facility_id: str
     user_id: str
     start_time: datetime
     end_time: datetime
@@ -32,10 +32,10 @@ def create_reservation(data: ReservationCreate):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO facility_reservations (shelter_id, user_id, start_time, end_time, purpose)
+                INSERT INTO facility_reservations (facility_id, user_id, start_time, end_time, purpose)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING reservation_id
-            """, (data.shelter_id, data.user_id, data.start_time, data.end_time, data.purpose))
+            """, (data.facility_id, data.user_id, data.start_time, data.end_time, data.purpose))
             conn.commit()
             return {"message": "reservation created", "reservation_id": str(cur.fetchone()[0])}
 
@@ -44,7 +44,7 @@ def get_reservations_by_user(user_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT reservation_id, shelter_id, start_time, end_time, status, purpose, created_at
+                SELECT reservation_id, facility_id, start_time, end_time, status, purpose, created_at
                 FROM facility_reservations WHERE user_id = %s
             """, (user_id,))
             reservations = cur.fetchall()
@@ -53,7 +53,7 @@ def get_reservations_by_user(user_id: str):
             return [
                 {
                     "reservation_id": str(r[0]),
-                    "shelter_id": str(r[1]),
+                    "facility_id": str(r[1]),
                     "start_time": str(r[2]),
                     "end_time": str(r[3]),
                     "status": r[4],
@@ -63,14 +63,14 @@ def get_reservations_by_user(user_id: str):
                 for r in reservations
             ]
 
-@router.get("/shelter/{shelter_id}", summary="避難所別のすべての予約を取得")
-def get_reservations_by_shelter(shelter_id: str):
+@router.get("/facility/{facility_id}", summary="施設別のすべての予約を取得")
+def get_reservations_by_facility(facility_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT reservation_id, user_id, start_time, end_time, status, purpose
-                FROM facility_reservations WHERE shelter_id = %s
-            """, (shelter_id,))
+                FROM facility_reservations WHERE facility_id = %s
+            """, (facility_id,))
             reservations = cur.fetchall()
             if not reservations:
                 raise HTTPException(status_code=404, detail="予約が見つかりません!")

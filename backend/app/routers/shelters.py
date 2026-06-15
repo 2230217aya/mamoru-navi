@@ -97,3 +97,30 @@ def get_shelter(shelter_id: str):
                 "longitude": s[4],
                 "capacity": s[5]
             }
+        
+@router.get("/nearest", summary="最寄りの避難所を取得")
+def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       ABS(latitude - %s) + ABS(longitude - %s) AS distance
+                FROM shelters
+                ORDER BY distance ASC
+                LIMIT %s
+            """, (lat, lng, limit))
+            shelters = cur.fetchall()
+            if not shelters:
+                raise HTTPException(status_code=404, detail="避難所が見つかりません!")
+            return [
+                {
+                    "shelter_id": str(s[0]),
+                    "name": s[1],
+                    "address": s[2],
+                    "latitude": s[3],
+                    "longitude": s[4],
+                    "capacity": s[5],
+                    "distance": round(s[6], 6)
+                }
+                for s in shelters
+            ]
