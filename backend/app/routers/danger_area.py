@@ -1,20 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from database import get_db_connection
+from database import get_db
 
 router = APIRouter(
     prefix="/danger-areas",
     tags=["Danger Areas"],
     responses={404: {"description": "Not found"}},
 )
-
-def get_db():
-    conn = get_db_connection()
-    try:
-        yield conn
-    finally:
-        conn.close()
 
 # ===== SCHEMA =====
 

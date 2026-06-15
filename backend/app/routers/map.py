@@ -1,18 +1,11 @@
-from fastapi import APIRouter, Depends
-from database import get_db_connection
+from fastapi import APIRouter
+from database import get_db
 
 router = APIRouter(
     prefix="/map",
     tags=["Map"],
     responses={404: {"description": "Not found"}},
 )
-
-def get_db():
-    conn = get_db_connection()
-    try:
-        yield conn
-    finally:
-        conn.close()
 
 # ===== ENDPOINTS =====
 

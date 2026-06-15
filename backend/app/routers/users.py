@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
 import uuid
-from database import get_db_connection
+from database import get_db
 
 # APIRouterのインスタンスを作成
 # これが「ユーザー関連」のエンドポイントをまとめるルーターになります。
@@ -13,12 +13,6 @@ router = APIRouter(
     tags=["Users"], # Swagger UIで表示されるタグ
     responses={404: {"description": "Not found"}},
 )
-def get_db():
-    conn = get_db_connection()
-    try:
-        yield conn
-    finally:
-        conn.close()
 
 # --- レスポンスモデルの定義 ---
 class UserCreate(BaseModel):
@@ -70,6 +64,15 @@ def get_users():
             users = cur.fetchall()
             return [{"user_id": str(u[0]), "name": u[1], "email": u[2]} for u in users]
 
+@router.get("/qr-code", response_model=QRCodeDataResponse, summary="ユーザーのQRコードコンテンツを取得")
+def get_user_qr_code():
+    dummy_user_identifier = "123e4567-e89b-12d3-a456-426614174000"
+    qr_content_string = f"mamoru_navi_user:{dummy_user_identifier}"
+    return QRCodeDataResponse(
+        qr_code_content=qr_content_string,
+        message="ユーザーIDに基づいたQRコードコンテンツを生成しました。"
+    )
+
 @router.get("/{user_id}", summary="IDでユーザーを取得する")
 def get_user(user_id: str):
     with get_db() as conn:
@@ -80,13 +83,6 @@ def get_user(user_id: str):
                 raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
             return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
         
-@router.get("/qr-code", response_model=QRCodeDataResponse, summary="ユーザーのQRコードコンテンツを取得")
-def get_user_qr_code():
-    dummy_user_identifier = "123e4567-e89b-12d3-a456-426614174000"
-    qr_content_string = f"mamoru_navi_user:{dummy_user_identifier}"
-    return QRCodeDataResponse(
-        qr_code_content=qr_content_string,
-        message="ユーザーIDに基づいたQRコードコンテンツを生成しました。"
-    )
+
 
 
