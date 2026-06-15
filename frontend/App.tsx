@@ -7,7 +7,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 // 各画面コンポーネントをインポート
 import MyPageScreen from './src/screens/MyPageScreen';
 import ProfileEditScreen from './src/screens/ProfileEditScreen';
-import OfflineDataScreen from './src/screens/OfflineDataScreen';
+import OfflineDataScreen from './src/screens/OfflineData';
 // 他にも追加する画面があればインポート
 
 const Tab = createBottomTabNavigator();
