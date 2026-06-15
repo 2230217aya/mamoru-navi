@@ -119,7 +119,7 @@ export default function MyPageScreen({ navigator }: any) {
       {/* ホームへ戻るボタン（グレー） */}
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => router.push("/")} // ※後で作るホーム画面への遷移名
+        onPress={() => router.back()}// ※後で作るホーム画面への遷移名
       >
         <Text style={styles.secondaryButtonText}>ホームへ戻る</Text>
       </TouchableOpacity>
@@ -159,7 +159,12 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 20,
   },
-
+  qrWrapper: {
+    width: 220,
+    height: 220,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   hiddenQrBox: {
     width: 220,
     height: 220,
