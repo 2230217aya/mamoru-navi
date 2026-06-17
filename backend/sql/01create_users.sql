@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL, -- ※元の設計はVARCHAR(20)でしたが、安全のため255に変更しています
     address TEXT NOT NULL,
     home_location GEOMETRY NOT NULL,
-    user_role VARCHAR(20) NOT NULL,
+    user_role VARCHAR(20) NOT NULL, -- 'citizen'(一般ユーザー), 'staff'(職員)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -34,7 +34,7 @@ INSERT INTO users (
     'test@example.com', 
     '東京都渋谷区〇〇', 
     ST_SetSRID(ST_MakePoint(139.700571, 35.658099), 4326), -- 渋谷駅の座標
-    'user',
+    'citizen',
     CURRENT_TIMESTAMP
 )
 ON CONFLICT (user_id) DO NOTHING;
