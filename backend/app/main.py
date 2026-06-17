@@ -51,6 +51,10 @@ def convert_crowd_level(current_user_count: int, capacity: int):
 def read_root():
     return {"message": "まもるナビ APIへようこそ！"}
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "バックエンドは動いています"}
+
 @app.post("/locations/")
 def receive_location(location: LocationRequest):
     conn = get_db_connection()
@@ -132,7 +136,23 @@ def get_offline_map_data():
     conn.close()
 
     # 取得した避難所情報をレスポンスとして返す
-    return {"shelters": [{"shelter_id": str(shelter[0]), "name": shelter[1], "address": shelter[2], "latitude": shelter[3], "longitude": shelter[4], "capacity": shelter[5], "updated_at": shelter[6]} for shelter in shelters]}
+    shelter_list = [
+        {
+            "shelter_id": str(shelter[0]),
+            "name": shelter[1],
+            "address": shelter[2],
+            "latitude": shelter[3],
+            "longitude": shelter[4],
+            "capacity": shelter[5],
+            "updated_at": shelter[6]
+        }
+        for shelter in shelters
+    ]
+    
+    return {
+        "count": len(shelter_list),
+        "shelters": shelter_list
+    }
 
 @app.get("/locations/{user_id}/latest")
 def get_latest_location(user_id: str):
