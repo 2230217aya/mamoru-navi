@@ -12,6 +12,9 @@ import QRCode from "react-native-qrcode-svg";
 import { SafeAreaFrameContext } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const QR_CACHE_KEY = "cached_qr_code_content";
 
 export default function MyPageScreen({ navigator }: any) {
   const router = useRouter(); // router を取得
@@ -25,40 +28,60 @@ export default function MyPageScreen({ navigator }: any) {
 
   useEffect(() => {
     const fetchQrCode = async () => {
+      // ★ 1. タイムアウト設定（3秒でオフラインと判断する）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
       try {
-        // Expo Goが接続しているPCのIPアドレスを自動取得する仕組み
         const debuggerHost = Constants.expoConfig?.hostUri;
-        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost"; // ← チームメンバーがPCのエミュレータ等で動かした時に「おま環」にならないよう、localhostに戻しました。
-        // 【チーム開発対応】
-        // ハードコードされたURLをそのままGitに上げると他のメンバーがエラーになってしまうため、
-        // .envファイル（Gitには上がらない秘密のファイル）からURLを読み込むように変更しました。
-        // もし.envが設定されていなければ、デフォルトでパソコンのlocalhost（192.168.0.20等）を見に行きます。
-        const baseUrl = `http://${localIp}:8000`;
+        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+        // .envがあればそれを使うように戻しました
+        const baseUrl =
+          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
         const apiUrl = `${baseUrl}/user/qr-code`;
 
         const response = await fetch(apiUrl, {
           method: "GET",
           headers: {
-            "Bypass-Tunnel-Reminder": "true", // ★ これを追加
+            "Bypass-Tunnel-Reminder": "true",
             "Content-Type": "application/json",
           },
+          signal: controller.signal, // ★ 2. fetchにタイムアウトの合図を渡す
         });
 
-        // デバッグ用：ステータスコードを確認
+        clearTimeout(timeoutId); // 通信成功したらタイマーを止める
+
         console.log("Response Status:", response.status);
 
         if (!response.ok) {
-          // エラーの詳細を知るためにメッセージを変更
           const errorText = await response.text();
           console.error("Error response:", errorText);
           throw new Error(`エラー: ${response.status}`);
         }
 
         const data = await response.json();
-        setQrData(data.qr_code_content); // バックエンドから受け取った文字列をセット
+        setQrData(data.qr_code_content);
+
+        // ★ 取得したQRデータをスマホに保存（キャッシュ）する
+        await AsyncStorage.setItem(QR_CACHE_KEY, data.qr_code_content);
+        setError(null);
       } catch (err) {
-        console.error("QRコード取得エラー:", err);
-        setError("QRコードを取得できませんでした");
+        clearTimeout(timeoutId); // エラー時もタイマーを止める
+        console.error("QRコード取得エラー（オフライン移行）:", err);
+
+        // ★ 3. 通信エラー時はキャッシュを探す
+        try {
+          const cachedQr = await AsyncStorage.getItem(QR_CACHE_KEY);
+
+          if (cachedQr) {
+            setQrData(cachedQr);
+            setError("※オフラインのため、保存されたQRを表示しています");
+          } else {
+            setError("オフラインです。一度オンラインでQRを取得してください。");
+          }
+        } catch (cacheErr) {
+          setError("QRコードを取得できませんでした");
+        }
       }
     };
 
@@ -71,21 +94,27 @@ export default function MyPageScreen({ navigator }: any) {
       {/* タイトル */}
       <Text style={styles.title}>マイQRコード</Text>
 
+      {/* ★ 変更：エラー(オフライン)メッセージは白い箱の外（上部）に配置する */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
       {/* QRコード表示エリア */}
       <View style={styles.qrContainer}>
         {isQrVisible ? (
           <View style={styles.qrWrapper}>
-            {error ? (
-              <Text style={{ color: "red", textAlign: "center" }}>{error}</Text>
-            ) : qrData === "Loading..." ? (
-              <Text>読み込み中...</Text>
-            ) : (
+            {/* エラーメッセージは外に出したので、ここはQRコードとLoadingだけになります */}
+            {qrData !== "Loading..." && (
               <QRCode
                 value={qrData}
                 size={220} // QRコードの大きさ
-                backgroundColor="transparent" // 背景色を透明に
+                backgroundColor="transparent"
               />
             )}
+
+            {qrData === "Loading..." && !error && <Text>読み込み中...</Text>}
           </View>
         ) : (
           // 「隠す」を押した時に表示されるグレーのモザイク代わりのブロック
@@ -177,6 +206,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#9CA3AF", // グレーの文字
+  },
+  errorBanner: {
+    backgroundColor: "#FEE2E2", // 薄い赤色の背景
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 20, // 白い箱との間に余白
+    borderWidth: 1,
+    borderColor: "#FCA5A5", // 赤い枠線
+  },
+  errorText: {
+    color: "#B91C1C", // 濃い赤色の文字
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
   },
   toggleButton: {
     backgroundColor: "#E5E7EB", // グレーの背景
