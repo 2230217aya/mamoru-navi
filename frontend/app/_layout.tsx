@@ -1,6 +1,6 @@
 // frontend/app/_layout.tsx
-import React, { useEffect } from "react";
-import { Stack } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Stack, useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database";
 import * as Network from "expo-network";
 import Constants from "expo-constants";
@@ -10,13 +10,53 @@ import HomeScreen from "./index"; // app/(tabs)/index.tsx を指す
 import MyPageScreen from "./my-page"; // app/my-page.tsx を指す
 import OfflineDataScreen from "./offline-data"; // app/offline-data.tsx を指す
 import DashboardScreen from "./dashbord"; // app/dashboard.tsx を指す
+import UserHomeScreen from "./user_home";
 
 export default function RootLayout() {
-  useEffect(() => {
-    LocalDB.init()
-      .then(() => console.log("Database ready"))
-      .catch((err) => console.error("Database init failed", err));
+  const router = useRouter();
 
+  // ★ 初期値を null にし、読み込み終わるまで待機するようにする
+  const [userRole, setUserRole] = useState<"citizen" | "staff" | null>(null);
+  const [dbReady, setDbReady] = useState(false);
+
+  useEffect(() => {
+    // --- データベース初期化 ---
+    LocalDB.init()
+      .then(() => {
+        console.log("Database ready");
+        setDbReady(true); // ★ 修正：これを追加して描画を許可する
+      })
+      .catch((err) => {
+        console.error("Database init failed", err);
+        // エラー時も一応描画させるために true にするか、エラー画面を出す
+        setDbReady(true);
+      });
+
+    // 2. データベース(PostgreSQL)からロールを取得する
+    const fetchUserRole = async () => {
+      try {
+        const debuggerHost = Constants.expoConfig?.hostUri;
+        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+        const baseUrl =
+          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+
+        const response = await fetch(`${baseUrl}/user/my-role`);
+        const data = await response.json();
+
+        if (data.status === "success") {
+          setUserRole(data.user_role); // "citizen" か "staff" が入る
+          console.log(`👤 ログインロール: ${data.user_role}`);
+        }
+      } catch (error) {
+        console.error("ロール取得失敗:", error);
+        // エラー時はデフォルトとして citizen にしておくなどのフォールバック
+        setUserRole("citizen");
+      }
+    };
+
+    fetchUserRole();
+
+    // --- 同期ロジック ---
     let isSyncing = false; // ★防衛策2: 同期中かどうかの「ロック」
     let consecutiveFailures = 0; // ★防衛策3: 連続失敗回数
 
@@ -83,38 +123,45 @@ export default function RootLayout() {
     // ※ クリーンアップ処理は不要な設計にしています
   }, []);
 
+  // ★ 読み込みが終わるまで何も表示しない（またはスプラッシュ画面を出す）
+  if (userRole === null || !dbReady) {
+    return null;
+  }
+
   // 関数名も RootLayout に変更
   return (
     // ★ Navigator を Stack に変更 ★
     <Stack
-      screenOptions={({ route }) => ({
-        // ★ 各画面のヘッダーは個別に設定するため、ここでは非表示 ★
+      screenOptions={{
         headerShown: false,
-        // 画面遷移のアニメーション (Figmaデザインに合わせて)
         animation: "slide_from_right",
-      })}
-      // ★★★ アプリ起動時に最初に表示する画面を "index" に指定 ★★★
-      initialRouteName="user_home"
+      }}
+      // ★ ロールによって最初に表示したい画面を出し分ける
+      //initialRouteName={userRole === "staff" ? "dashbord" : "user_home"}
     >
       {/* 
-        ここに、アプリを構成する画面（ファイル名）を登録します。
-        "index" が最初の画面になります。
+         画面の登録（順序は関係ありません） 
       */}
       <Stack.Screen name="index" options={{ title: "ホーム" }} />
+      <Stack.Screen name="user_home" options={{ title: "住民ホーム" }} />
+      <Stack.Screen name="dashbord" options={{ title: "ダッシュボード" }} />
+
+      {/* 住民専用エリア */}
       <Stack.Screen name="my-page" options={{ title: "マイQR" }} />
       <Stack.Screen
         name="profile-confirm"
         options={{ title: "個人情報確認" }}
       />
       <Stack.Screen name="profile-edit" options={{ title: "個人情報編集" }} />
-      <Stack.Screen name="offline-data" options={{ title: "データ管理" ,animation: "slide_from_left"}} />
-      <Stack.Screen name="dashbord" options={{ title: "ダッシュボード" }} />
+      <Stack.Screen
+        name="offline-data"
+        options={{ title: "データ管理", animation: "slide_from_left" }}
+      />
+
+      {/* 職員専用エリア */}
       <Stack.Screen name="scan-qr" options={{ title: "QRコードスキャン" }} />
       <Stack.Screen name="scan-result" options={{ title: "受付結果" }} />
       <Stack.Screen name="id-scan" options={{ title: "身分証明書スキャン" }} />
-      <Stack.Screen name="user_home"  options={{ title: 'ホーム' }} />
-      
     </Stack>
-    
   );
 }

@@ -1,72 +1,125 @@
 // frontend/src/screens/ProfileConfirmScreen.tsx
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
-
-// 仮のデータ
-const dummyUserData = {
-  name: '佐藤 健太',
-  gender: '男性',
-  birthday: '1998/12/09',
-  age: 28, // 誕生日から計算して表示する想定
-  bloodType: 'A',
-  medicalConditions: 'なし',
-  contact: '090-1111-1111',
-  address: '大阪市北区\n中崎西2丁目3-35', // 改行を含める
-};
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  ScrollView,
+} from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
+import Constants from "expo-constants";
 
 export default function ProfileConfirmScreen() {
   const router = useRouter();
+
+  // ★ プロフィールデータを管理するState
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // ★ 画面起動時にAPIからデータを取得する
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const fetchProfile = async () => {
+        try {
+          const debuggerHost = Constants.expoConfig?.hostUri;
+          const localIp = debuggerHost
+            ? debuggerHost.split(":")[0]
+            : "localhost";
+          const baseUrl =
+            process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+
+          const response = await fetch(`${baseUrl}/user/profile`);
+          const data = await response.json();
+
+          if (isActive && data.status === "success") {
+            setProfile(data.profile);
+          }
+        } catch (error) {
+          console.error("プロフィール取得失敗:", error);
+        } finally {
+          if (isActive) setLoading(false);
+        }
+      };
+
+      fetchProfile();
+
+      // 画面から離れる時のクリーンアップ処理
+      return () => {
+        isActive = false;
+      };
+    }, []), // 依存配列は [] でOK
+  );
+
+  if (loading)
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text>読み込み中...</Text>
+      </SafeAreaView>
+    );
+  if (!profile)
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={{ marginTop: 20, textAlign: "center" }}>
+          データが見つかりません
+        </Text>
+      </SafeAreaView>
+    );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>個人情報の確認</Text>
 
-        {/* 情報を囲む角丸の枠 */}
+        {/* 情報を囲む角丸の枠：デザインはそのまま維持 */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.label}>氏名</Text>
-            <Text style={styles.value}>{dummyUserData.name}</Text>
+            {/* ★ dummyUserData ではなく profile から表示 */}
+            <Text style={styles.value}>{profile.name}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>性別</Text>
-            <Text style={styles.value}>{dummyUserData.gender}</Text>
+            <Text style={styles.value}>{profile.gender || "未設定"}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>誕生日</Text>
-            <Text style={styles.value}>{dummyUserData.birthday} ({dummyUserData.age}才)</Text>
+            <Text style={styles.value}>{profile.birthday || "未設定"}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>血液型</Text>
-            <Text style={styles.value}>{dummyUserData.bloodType}</Text>
+            <Text style={styles.value}>{profile.blood_type || "未設定"}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>持病</Text>
-            <Text style={styles.value}>{dummyUserData.medicalConditions}</Text>
+            <Text style={styles.value}>
+              {profile.medical_conditions || "なし"}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>連絡先</Text>
-            <Text style={styles.value}>{dummyUserData.contact}</Text>
+            <Text style={styles.value}>{profile.phone_number}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>住所</Text>
-            <Text style={styles.value}>{dummyUserData.address}</Text>
+            <Text style={styles.value}>{profile.address || "未設定"}</Text>
           </View>
         </View>
 
-        {/* 編集画面へのボタン */}
-        <TouchableOpacity 
+        {/* ボタン部分はそのまま */}
+        <TouchableOpacity
           style={styles.editButton}
-          onPress={() => router.push('../profile-edit')} // ★ 編集ページへ遷移 ★
+          onPress={() => router.push("../profile-edit")}
         >
           <Text style={styles.editButtonText}>個人情報の編集</Text>
         </TouchableOpacity>
 
-        {/* 戻るボタン */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()} // ★ マイページへ戻る ★
+          onPress={() => router.back()}
         >
           <Text style={styles.backButtonText}>戻る</Text>
         </TouchableOpacity>
@@ -75,50 +128,55 @@ export default function ProfileConfirmScreen() {
   );
 }
 
+// スタイル（styles）
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAFAFA', paddingTop: 60 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 30, color: '#333' },
+  container: { flex: 1, backgroundColor: "#FAFAFA", paddingTop: 60 },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
+  title: { fontSize: 22, fontWeight: "bold", marginBottom: 30, color: "#333" },
   infoCard: {
-    width: '100%',
-    backgroundColor: '#fff',
+    width: "100%",
+    backgroundColor: "#fff",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#333', // 黒い枠線
+    borderColor: "#333",
     padding: 20,
     marginBottom: 30,
   },
   infoRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 15,
   },
   label: {
-    width: 80, // ラベルの幅を固定して揃える
+    width: 80,
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    color: "#333",
+    fontWeight: "500",
   },
   value: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
-    lineHeight: 24, // 改行時の行間
+    color: "#333",
+    lineHeight: 24,
   },
   editButton: {
-    backgroundColor: '#FDE047', // 黄色
-    width: '100%',
+    backgroundColor: "#FDE047",
+    width: "100%",
     paddingVertical: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 15,
   },
-  editButtonText: { color: '#333', fontSize: 16, fontWeight: 'bold' },
+  editButtonText: { color: "#333", fontSize: 16, fontWeight: "bold" },
   backButton: {
-    backgroundColor: '#E5E7EB', // グレー
-    width: '80%',
+    backgroundColor: "#E5E7EB",
+    width: "80%",
     paddingVertical: 16,
     borderRadius: 30,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  backButtonText: { color: '#4B5563', fontSize: 16, fontWeight: 'bold' },
+  backButtonText: { color: "#4B5563", fontSize: 16, fontWeight: "bold" },
 });
