@@ -88,12 +88,11 @@ def get_user_qr_code():
 def get_user(user_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
+            cur.execute("SELECT user_id, name, gender, birthday, age, blood_type, medical_conditions, phone_number, address FROM users WHERE user_id = %s", (user_id,))
             user = cur.fetchone()
             if not user:
                 raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
-            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
-        
+            return {"user_id": str(user[0]), "name": user[1], "gender": user[2], "birthday": user[3], "age": user[4], "blood_type": user[5], "medical_conditions": user[6], "phone_number": user[7], "address": user[8]}
 
 
 

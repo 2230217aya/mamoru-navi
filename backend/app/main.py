@@ -464,7 +464,7 @@ def get_offline_map_data():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT shelter_id, name, address, latitude, longitude, capacity, update_at
+                SELECT shelter_id, name, address, latitude, longitude, capacity, updated_at
                 FROM shelters ORDER BY name
             """)
             shelters = cur.fetchall()
