@@ -36,6 +36,17 @@ class QRCodeDataResponse(BaseModel):
     qr_code_content: str
     message: str = "QRコードのコンテンツを生成しました。"
 
+
+# プロフィール更新で受け取るデータの型定義
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    birthday: Optional[str] = None
+    blood_type: Optional[str] = None
+    medical_conditions: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None    
+
 # --- エンドポイントの定義 ---
 
 @router.post("/", summary="ユーザーを作成する")
@@ -85,4 +96,93 @@ def get_user(user_id: str):
         
 
 
+
+
+# 本来は認証トークンから取得しますが、今はテストユーザーの固定UUIDを使用します
+TEST_USER_ID = "123e4567-e89b-12d3-a456-426614174000"
+
+@router.get("/profile", summary="ユーザーのプロフィールを取得")
+def get_user_profile():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT name, gender, birthday, blood_type, medical_conditions, phone_number, address  -- ★birthdayを追加
+            FROM users WHERE user_id = %s;
+        """, (TEST_USER_ID,))
+        user = cur.fetchone()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+            
+        return {"status": "success", "profile": dict(user)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@router.patch("/profile", summary="ユーザーのプロフィールを更新")
+def update_user_profile(profile: UserProfileUpdate):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Pydanticモデルから、値が入っている（送信された）項目だけを辞書で取得
+        update_data = profile.model_dump(exclude_unset=True)
+        
+        if not update_data:
+            return {"status": "success", "message": "更新するデータがありません"}
+
+        update_fields = []
+        values = []
+        
+        for key, value in update_data.items():
+            # SQLの「カラム名 = %s」の部分を作る
+            update_fields.append(f"{key} = %s")
+            # 空文字 "" が送られてきた場合は None (NULL) に変換する処理を入れるとDBが安定します
+            values.append(value if value != "" else None)
+            
+        # 更新日時(updated_at)を追加
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        
+        # SQL文を組み立て
+        sql = f"UPDATE users SET {', '.join(update_fields)} WHERE user_id = %s"
+        values.append(TEST_USER_ID)
+        
+        # デバッグ用：どんなSQLが実行されるかサーバーのログに出す
+        print(f"Executing SQL: {sql} with values: {values}")
+        
+        cur.execute(sql, tuple(values))
+        conn.commit()
+        
+        return {"status": "success", "message": "プロフィールを更新しました！"}
+    except Exception as e:
+        conn.rollback()
+        # ★ エラーメッセージを print して Docker ログで見えるようにする
+        print(f"Database update error: {str(e)}")
+        # 500エラーとして詳細な理由を返す
+        raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+
+
+# backend/app/routers/users.py
+
+@router.get("/my-role", summary="現在のユーザーのロールを取得")
+def get_user_role():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # TEST_USER_ID は 123e4567... を使用
+        cur.execute("SELECT user_role FROM users WHERE user_id = %s;", (TEST_USER_ID,))
+        result = cur.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+            
+        return {"status": "success", "user_role": result["user_role"]}
+    finally:
+        cur.close()
+        conn.close()        
 

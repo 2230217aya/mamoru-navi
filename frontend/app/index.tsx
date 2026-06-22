@@ -1,91 +1,45 @@
-// frontend/app/(tabs)/index.tsx
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router'; // 画面遷移用のフック
-//import TextComponent from '../../components/themed-text';
-// ★ホーム画面自体のUIコードは、このファイル内に直接書くのがシンプル★
-// このファイルが、タブの「ホーム」として機能します。
+// frontend/app/index.tsx
+import { Redirect } from "expo-router";
+import React, { useEffect, useState } from "react";
+import Constants from "expo-constants";
+import { View, ActivityIndicator } from "react-native";
 
-export default function HomeScreen() {
-  const router = useRouter();
-  return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>まもるナビ仮ホームページ</Text>
-      <Text style={styles.subtitle}>ようこそ！</Text>
+export default function Index() {
+  const [role, setRole] = useState<string | null>(null);
 
-      <TouchableOpacity 
-        style={styles.button}
-        // ★ app/my-page.tsx が存在するので、このパスでOK ★
-        onPress={() => router.push('./my-page')} 
-      >
-        <Text style={styles.buttonText}>マイページへ</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.button}
-        // ★ app/user-home.tsx が存在するので、このパスでOK ★
-        onPress={() => router.push('./user_home')} 
-      >
-        <Text style={styles.buttonText}>ユーザーホームページへ</Text>
-      </TouchableOpacity>
+  useEffect(() => {
+    const fetchRole = async () => {
+      try {
+        const debuggerHost = Constants.expoConfig?.hostUri;
+        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+        const baseUrl =
+          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+        const response = await fetch(`${baseUrl}/user/my-role`);
+        const data = await response.json();
+        setRole(data.user_role);
+      } catch (e) {
+        console.error("Redirect Error:", e);
+        setRole("citizen"); // エラー時はとりあえず住民
+      }
+    };
+    fetchRole();
+  }, []);
 
+  // 判定中はローディングを表示（真っ白を防ぐ）
+  if (role === null) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#60A5FA" />
+      </View>
+    );
+  }
 
-      <TouchableOpacity 
-        style={styles.button}
-        // ★ app/offline-data.tsx が存在するので、このパスでOK ★
-        onPress={() => router.push('./offline-data')} 
-      >
-        <Text style={styles.buttonText}>オフラインデータ管理</Text>
-      </TouchableOpacity>
-
-       <TouchableOpacity 
-        style={styles.button}
-        onPress={() => router.push('./dashbord')} 
-      >
-        <Text style={styles.buttonText}>ダッシュボード</Text>
-      </TouchableOpacity>
-      
-      <Text style={styles.footerText}>災害時も安心の備えを。</Text>
-    </SafeAreaView>
-  )
+  // ★ ここで各画面へリダイレクト（転送）★
+  if (role === "staff") {
+    // 職員ならダッシュボードへ
+    return <Redirect href="/dashbord" />;
+  } else {
+    // 住民なら住民ホームへ（または (tabs) へ）
+    return <Redirect href="/user_home" />;
+  }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f0f4f8',
-    padding: 20,
-  },
-  title: {
-    fontSize: 25,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-    letterSpacing: 2,
-  },
-  subtitle: {
-    fontSize: 20,
-    color: '#555',
-    marginBottom: 50,
-  },
-  button: {
-    backgroundColor: '#60A5FA', // 青系のボタン色
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    marginBottom: 20,
-    width: '80%',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  footerText: {
-    marginTop: 50,
-    fontSize: 14,
-    color: '#777',
-  },
-});

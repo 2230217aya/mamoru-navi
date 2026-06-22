@@ -165,7 +165,7 @@ export default function dashboard() {
   return (
     <View style={styles.container}>
       {/* 右上のアイコン */}
-      <Pressable onPress={() => router.push("/")} style={styles.userIconButton}>
+      <Pressable onPress={() => router.push("/user-list")} style={styles.userIconButton}>
         <Image
           source={require("@/assets/images/dashboard-userIcon.png")}
           style={styles.userIcon}
