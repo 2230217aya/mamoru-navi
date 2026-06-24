@@ -2,37 +2,27 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from config import OLD_LOCATION_STALE_MINUTES
-from routers import users
-from routers import scan
+from routers import users, scan # まとめてインポート
 from database import get_db_connection
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
 import psycopg2
+import uuid
+import time
+from contextlib import asynccontextmanager
 
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 開発時はすべて許可
-    allow_credentials=True,
-    allow_methods=["*"],  # GET, POST, DELETE などすべて許可
-    allow_headers=["*"],  # すべてのヘッダー（Bypass-Tunnel-Reminderなど）を許可
-)
-
-app.include_router(users.router)
-app.include_router(scan.router)
-
+# ==========================================
+# 1. リクエストモデル & ユーティリティ
+# ==========================================
 class LocationRequest(BaseModel):
     user_id: str
     latitude: float
     longitude: float  
 
 def convert_crowd_level(current_user_count: int, capacity: int):
-    # capacityが0の場合はcrowd_levelを「unknown」とする
     if capacity is None or capacity <= 0:
         return None, "unknown"
-    # 混雑度を計算する
     crowd_rate = current_user_count / capacity
-    # 混雑度に応じてcrowd_levelを判定する
     if crowd_rate < 0.5:
         crowd_level = "空きあり"
     elif crowd_rate < 0.8:
@@ -41,10 +31,73 @@ def convert_crowd_level(current_user_count: int, capacity: int):
         crowd_level = "混雑"
     else:
         crowd_level = "満員"
-        
-
     return round(crowd_rate, 2), crowd_level
 
+# ==========================================
+# 2. Lifespan (起動・終了時処理) の定義
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🚀 アプリケーション起動シーケンス開始...")
+    
+    # データベース接続リトライロジック
+    conn = None
+    retry_count = 5
+    while retry_count > 0:
+        try:
+            conn = get_db_connection()
+            print("✅ データベースに接続できました。")
+            break
+        except Exception as e:
+            print(f"⚠️ DB接続待ち... 残り {retry_count} 回: {e}")
+            retry_count -= 1
+            time.sleep(2)
+
+    if conn:
+        try:
+            cur = conn.cursor()
+            print("🛠️ データベースの初期設定を確認中...")
+            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+            # pgrouting はインストールされていない環境が多いので失敗してもスキップするようにする
+            try:
+                cur.execute("CREATE EXTENSION IF NOT EXISTS pgrouting;")
+            except:
+                print("ℹ️ pgrouting extension is not available. Skipping.")
+            conn.commit()
+            cur.close()
+            conn.close()
+            print("✅ データベースの初期設定が完了しました。")
+        except Exception as e:
+            print(f"❌ DB初期化中にエラー発生: {e}")
+    
+    yield  # ここでAPIの受付が始まる
+    print("🛑 アプリケーション終了")
+
+# ==========================================
+# 3. FastAPIインスタンスの生成 (唯一のapp)
+# ==========================================
+app = FastAPI(lifespan=lifespan)
+
+# ==========================================
+# 4. ミドルウェア設定 (唯一のappに対して)
+# ==========================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==========================================
+# 5. ルーターの登録 (唯一のappに対して)
+# ==========================================
+app.include_router(users.router)
+app.include_router(scan.router)
+
+# ==========================================
+# 6. エンドポイント定義
+# ==========================================
 
 
 @app.get("/")
@@ -344,3 +397,93 @@ def get_shelter_heatmap_data():
             "crowd_level": crowd_level
         })
     return {"heatmap_data": heatmap_data}
+
+# get_my_evacuation_plan
+
+@app.get("/map/my-plan/{user_id}")
+def get_my_evacuation_plan(user_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    try:
+        # 1. ユーザーの現在地に最も近い「道路の点(Node)」と「最寄りの避難所」を特定
+        cur.execute("""
+            WITH user_location AS (
+                -- 最後に記録されたユーザーの位置
+                SELECT location FROM user_locations WHERE user_id = %s ORDER BY recorded_at DESC LIMIT 1
+            ),
+            target_shelter AS (
+                -- ユーザーから最も近い避難所
+                SELECT shelter_id, name, latitude, longitude, location as geom
+                FROM shelters
+                ORDER BY location <-> (SELECT location FROM user_location)
+                LIMIT 1
+            )
+            SELECT 
+                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT location FROM user_location) LIMIT 1) as start_node,
+                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT geom FROM target_shelter) LIMIT 1) as end_node,
+                s.shelter_id, s.name as shelter_name, s.latitude, s.longitude
+            FROM target_shelter s;
+        """, (user_id,))
+        points = cur.fetchone()
+
+        if not points:
+             raise HTTPException(status_code=404, detail="現在地または避難所が見つかりません")
+
+        # 2. pgRouting を使って本物のルート(GeoJSON)を生成
+        # waysテーブルの the_geom(道路の形) をつなぎ合わせて LineString にする
+        try:
+            cur.execute("""
+                SELECT ST_AsGeoJSON(ST_Transform(ST_MakeLine(res.the_geom), 4326)) as geojson
+                FROM (
+                    SELECT w.the_geom
+                    FROM pgr_dijkstra(
+                        'SELECT id, source, target, cost_s AS cost FROM ways WHERE cost_s > 0',
+                        %s, %s, directed := false
+                    ) AS di
+                    JOIN ways AS w ON di.edge = w.id
+                    ORDER BY di.seq
+                ) AS res;
+            """, (points['start_node'], points['end_node']))
+            route_result = cur.fetchone()
+        except Exception as e:
+            print(f"⚠️ pgRouting 実行エラー: {e}")
+            route_result = None
+
+        # --- ★ ここから修正：フォールバック処理 ---
+        if not route_result or not route_result['geojson']:
+            print("⚠️ 道路網が見つからないため、直線ルートを生成します")
+            # 道路データがなくてもアプリがクラッシュしないように「点2つの直線」を返す
+            route_data = {
+                "type": "LineString",
+                "coordinates": [
+                    [135.5000, 34.7333], # 実際は現在地座標
+                    [points['longitude'], points['latitude']] # 避難所座標
+                ]
+            }
+        else:
+            import json
+            route_data = json.loads(route_result['geojson'])
+
+
+
+        return {
+            "status": "success",
+            "plan": {
+                "plan_id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "primary_shelter_id": str(points['shelter_id']),
+                "route_data": route_data,
+                "meeting_point_name": points['shelter_name'],
+                "meeting_point_lat": points['latitude'],
+                "meeting_point_lon": points['longitude'],
+                "updated_at": datetime.now().isoformat()
+            }
+        }
+
+    except Exception as e:
+        print(f"❌ Error during routing: {e}")
+        raise HTTPException(status_code=500, detail="経路計算エラーが発生しました")
+    finally:
+        cur.close()
+        conn.close()

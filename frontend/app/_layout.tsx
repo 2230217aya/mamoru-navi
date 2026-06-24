@@ -4,13 +4,8 @@ import { Stack, useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database";
 import * as Network from "expo-network";
 import Constants from "expo-constants";
-
-// ★ app/ フォルダ直下のコンポーネントをインポート ★
-import HomeScreen from "./index"; // app/(tabs)/index.tsx を指す
-import MyPageScreen from "./my-page"; // app/my-page.tsx を指す
-import OfflineDataScreen from "./offline-data"; // app/offline-data.tsx を指す
-import DashboardScreen from "./dashbord"; // app/dashboard.tsx を指す
-import UserHomeScreen from "./user_home";
+import { updateStayStats, smartAutoCache } from "@/src/utils/mapUtils";
+import * as Location from "expo-location";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -20,74 +15,66 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    // --- データベース初期化 ---
+    // --- ★ 共通設定：baseUrl生成を1箇所に集約 ---
+    const debuggerHost = Constants.expoConfig?.hostUri;
+    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+
+    // 1. データベース初期化
     LocalDB.init()
       .then(() => {
         console.log("Database ready");
-        setDbReady(true); // ★ 修正：これを追加して描画を許可する
+        setDbReady(true);
       })
       .catch((err) => {
         console.error("Database init failed", err);
-        // エラー時も一応描画させるために true にするか、エラー画面を出す
         setDbReady(true);
       });
 
-    // 2. データベース(PostgreSQL)からロールを取得する
+    // 2. ロール取得
     const fetchUserRole = async () => {
       try {
-        const debuggerHost = Constants.expoConfig?.hostUri;
-        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-        const baseUrl =
-          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+        const response = await fetch(`${baseUrl}/user/my-role`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
 
-        const response = await fetch(`${baseUrl}/user/my-role`);
         const data = await response.json();
-
         if (data.status === "success") {
-          setUserRole(data.user_role); // "citizen" か "staff" が入る
+          setUserRole(data.user_role);
           console.log(`👤 ログインロール: ${data.user_role}`);
+        } else {
+          setUserRole("citizen");
         }
       } catch (error) {
-        console.error("ロール取得失敗:", error);
-        // エラー時はデフォルトとして citizen にしておくなどのフォールバック
-        setUserRole("citizen");
+        console.log(
+          "❌ ネットワークエラーにつき、オフラインモードで開始します",
+        );
+        setUserRole("citizen"); // ★ここが重要：エラーでも必ずセットする
       }
     };
 
     fetchUserRole();
 
-    // --- 同期ロジック ---
-    let isSyncing = false; // ★防衛策2: 同期中かどうかの「ロック」
-    let consecutiveFailures = 0; // ★防衛策3: 連続失敗回数
+    // 3. 同期ロジック (checkAndSync)
+    let isSyncing = false;
+    let consecutiveFailures = 0;
 
     const checkAndSync = async () => {
-      // もし既に同期中なら、何もせず終了（二重送信防止）
       if (isSyncing) return;
-
       try {
         const networkState = await Network.getNetworkStateAsync();
-
         if (networkState.isConnected && networkState.isInternetReachable) {
-          isSyncing = true; // ロックをかける
-
-          // ★防衛策1: 5件だけ取得して送る
+          isSyncing = true;
           const pendingItems = await LocalDB.getPendingSyncs(5);
-
           if (pendingItems && pendingItems.length > 0) {
             console.log(`📡 同期開始: ${pendingItems.length}件を送信...`);
-
-            const debuggerHost = Constants.expoConfig?.hostUri;
-            const localIp = debuggerHost
-              ? debuggerHost.split(":")[0]
-              : "localhost";
-            const baseUrl =
-              process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-
             const result = await LocalDB.syncWithServer(baseUrl, pendingItems);
-
             if (result.success) {
               console.log(`✅ 同期成功`);
-              consecutiveFailures = 0; // 成功したら失敗回数をリセット
+              consecutiveFailures = 0;
             } else {
               throw new Error(result.message);
             }
@@ -95,32 +82,54 @@ export default function RootLayout() {
         }
       } catch (error) {
         console.log(`❌ 同期エラー: ${error}`);
-        consecutiveFailures++; // 失敗したらカウントアップ
+        consecutiveFailures++;
       } finally {
-        isSyncing = false; // 処理が終わったらロックを解除
+        isSyncing = false;
       }
     };
 
-    // ★防衛策3: 動的なタイマー（バックオフ）
+    // ポーリング開始
     const startSmartPolling = () => {
-      // 基本は10秒間隔。連続失敗が多いほど、待機時間を長くする（最大2分）
-      // 例: 0回=10秒, 1回=20秒, 2回=30秒...
       const baseInterval = 10000;
       const maxInterval = 120000;
       const currentInterval = Math.min(
         baseInterval + consecutiveFailures * 10000,
         maxInterval,
       );
-
       setTimeout(async () => {
         await checkAndSync();
-        startSmartPolling(); // 終わったら、次のタイマーを再帰的にセットする
+        startSmartPolling();
       }, currentInterval);
     };
 
-    startSmartPolling(); // ループ開始
+    // 4. スマートバックグラウンドロジック (生活圏学習・キャッシュ)
+    const startBackgroundSmartLogic = () => {
+      const INTERVAL = 15 * 60 * 1000; // 15分
+      setTimeout(async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            await updateStayStats(
+              location.coords.latitude,
+              location.coords.longitude,
+            );
+            console.log("📍 StayStats updated in background");
+          }
+          await smartAutoCache();
+        } catch (error) {
+          console.log("⚠️ Background logic skip:", error);
+        } finally {
+          startBackgroundSmartLogic();
+        }
+      }, INTERVAL);
+    };
 
-    // ※ クリーンアップ処理は不要な設計にしています
+    // --- ★ 実行：両方のループを確実に開始する ---
+    startSmartPolling();
+    startBackgroundSmartLogic();
   }, []);
 
   // ★ 読み込みが終わるまで何も表示しない（またはスプラッシュ画面を出す）
@@ -128,7 +137,6 @@ export default function RootLayout() {
     return null;
   }
 
-  // 関数名も RootLayout に変更
   return (
     // ★ Navigator を Stack に変更 ★
     <Stack
