@@ -48,19 +48,31 @@ export default function RootLayout() {
           },
         });
 
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log("ロール取得APIエラー:", response.status);
+          console.log("エラー詳細:", errorText);
+
+          // /user/my-role が未実装または404の場合は、住民として進める
+          setUserRole("citizen");
+          return;
+        }
+
         const data = await response.json();
 
         if (data.status === "success") {
-          setUserRole(data.user_role); // "citizen" か "staff" が入る
+          const role = data.user_role === "staff" ? "staff" : "citizen"; // デフォルトは citizen
+          setUserRole(role);
           console.log(`👤 ログインロール: ${data.user_role}`);
+        } else {
+        // エラー時はデフォルトとして citizen にしておくなどのフォールバック
+        setUserRole("citizen");
         }
       } catch (error) {
         console.error("ロール取得失敗:", error);
-        // エラー時はデフォルトとして citizen にしておくなどのフォールバック
-        setUserRole("citizen");
+        setUserRole("citizen"); // エラー時はデフォルトとして citizen にする
       }
     };
-
     fetchUserRole();
 
     // --- 同期ロジック ---
