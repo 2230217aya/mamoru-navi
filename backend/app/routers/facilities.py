@@ -14,18 +14,6 @@ class FacilityCreate(BaseModel):
     type: str
     address: str
 
-@router.post("/", summary="施設を作成する")
-def create_facility(data: FacilityCreate):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO facilities (name, type, address)
-                VALUES (%s, %s, %s)
-                RETURNING facility_id
-            """, (data.name, data.type, data.address))
-            conn.commit()
-            return {"message": "facility created", "facility_id": str(cur.fetchone()[0])}
-
 @router.get("/", summary="全施設を取得する")
 def get_facilities(type: Optional[str] = None):
     with get_db() as conn:

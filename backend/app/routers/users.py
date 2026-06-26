@@ -1,6 +1,6 @@
 # backend/app/routers/users.py
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import uuid
@@ -36,7 +36,6 @@ class QRCodeDataResponse(BaseModel):
     """
     qr_code_content: str
     message: str = "QRコードのコンテンツを生成しました。"
-
 
 # プロフィール更新で受け取るデータの型定義
 class UserProfileUpdate(BaseModel):
@@ -166,7 +165,6 @@ def update_user_profile(profile: UserProfileUpdate):
         cur.close()
         conn.close()
 
-
 # backend/app/routers/users.py
 
 @router.get("/my-role", summary="現在のユーザーのロールを取得")
@@ -185,4 +183,3 @@ def get_user_role():
     finally:
         cur.close()
         conn.close()        
-

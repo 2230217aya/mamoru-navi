@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS facility_reservations (
     end_time TIMESTAMP NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     purpose TEXT,
+    queue_number INTEGER,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
