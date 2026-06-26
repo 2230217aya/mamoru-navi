@@ -38,7 +38,7 @@ export default function MyPageScreen({ navigator }: any) {
         // .envがあればそれを使うように戻しました
         const baseUrl =
           process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-        const apiUrl = `${baseUrl}/users/qr-code`;
+        const apiUrl = `${baseUrl}/user/qr-code`;
 
         const response = await fetch(apiUrl, {
           method: "GET",

@@ -141,7 +141,7 @@ export default function userList() {
 
         {/* 右上のアイコン */}
         <Pressable onPress={() => router.push("/supplies-status")} style={styles.cardboardImageButton}>
-            <Image source={require('@/assets/images/userList-cardboard.png')} style={styles.cardboardImage} />
+            <Image source={require('@/assets/images/hinan.png')} style={styles.cardboardImage} />
         </Pressable>
       </View>
 
