@@ -30,7 +30,13 @@ export default function ProfileConfirmScreen() {
             ? debuggerHost.split(":")[0]
             : "localhost";
           const baseUrl =
-            process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+            process.env.EXPO_PUBLIC_API_URL ||
+            // 1. まず localIp が localhost ならそのまま localhost を使う
+            // 2. もしあなたが adb reverse を実行済みなら、スマホ内の localhost:8000 が PC に直結している
+            // 3. 他の人がモバイルスポット(192.x.x.x)を使っているなら、localIp は自動的にそのIPになる
+            (localIp === "localhost" || localIp === "127.0.0.1"
+              ? `http://localhost:8000`
+              : `http://${localIp}:8000`);
 
           const response = await fetch(`${baseUrl}/user/profile`);
           const data = await response.json();

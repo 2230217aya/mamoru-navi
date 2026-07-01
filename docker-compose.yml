@@ -28,18 +28,34 @@ services:
     stdin_open: true # コンテナ内でコマンドを実行し続けるために必要
     tty: true
 
-  # 3. データベースサービス
+  # 3. データベースサービス (OSMインポート機能内蔵版)
   db:
-    image: postgis/postgis:15-3.4 # PostGIS拡張機能が入ったPostgreSQLイメージ
+    # 以前作成した osm2pgrouting インストール済みのDockerfileを使用
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    container_name: mamoru-navi-db-1 # 名前を固定しておくと便利です
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-      - ./backend/sql:/docker-entrypoint-initdb.d # 初回起動時に自動でSQLを実行する
+      # 平常時のSQL初期化
+      - ./backend/sql:/docker-entrypoint-initdb.d
+      # ★これが重要：OSMインポートスクリプト
+      - ./db/init-osm.sh:/docker-entrypoint-initdb.d/init-osm.sh
+      # 巨大な生データ
+      - ./kinki-latest.osm.pbf:/tmp/kinki-latest.osm.pbf
     ports:
       - "5432:5432"
     environment:
       - POSTGRES_DB=mamoru_navi_db
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mamoru_navi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # ★ restart設定：不慮の停止時に自動復旧させる
+    restart: always
 
 volumes:
   postgres_data:

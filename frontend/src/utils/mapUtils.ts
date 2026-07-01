@@ -3,6 +3,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import { LocalDB } from "@/src/db/database"; // ★重要: これが抜けていました
+// ===== baseAPIまとめ =====
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
 /**
  * GeoJSONの座標配列を変換
@@ -21,7 +23,7 @@ export function convertGeoJsonToMapPoints(geojson: any) {
  * 目的地の取得
  */
 export function getDestinationPoint(geojson: any) {
-  const points = convertGeoJsonToMapPoints(geojson);
+  const points = geojson;
   return points.length > 0 ? points[points.length - 1] : null;
 }
 
@@ -54,22 +56,29 @@ export async function downloadTile(z: number, x: number, y: number) {
   const tileUrl = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 
   try {
+    // フォルダ作成
     const folderInfo = await FileSystem.getInfoAsync(folderPath);
     if (!folderInfo.exists) {
       await FileSystem.makeDirectoryAsync(folderPath, { intermediates: true });
     }
-    const fileInfo = await FileSystem.getInfoAsync(filePath);
-    if (fileInfo.exists) return;
 
+    // ★重要：ダウンロード済みの場合は一度中身を確認するか、
+    // テスト時は強制的に上書きするように一時的にフラグを変える
+    const fileInfo = await FileSystem.getInfoAsync(filePath);
+    if (fileInfo.exists) return; // 本番はこれでOK（リセット後なら綺麗なのが入る）
+
+    // ★ ここに User-Agent を追加してダウンロード
     await FileSystem.downloadAsync(tileUrl, filePath, {
       headers: {
-        "User-Agent": "MamoruNaviApp/1.0", // これを入れると skip が減ります
+        "User-Agent": "MamoruNavi_Official_App_v1", // 固有の名前に
+        Accept: "image/png",
       },
     });
 
-    await sleep(200); // サーバー負荷軽減
+    // ★サーバーへの負荷を考慮し、待ち時間を少し増やす (0.3秒〜0.5秒)
+    await new Promise((resolve) => setTimeout(resolve, 300));
   } catch (error) {
-    console.log(`⚠️ Tile skip: ${z}/${x}/${y}`);
+    console.log(`⚠️ Tile failed: ${z}/${x}/${y}`);
   }
 }
 
@@ -126,33 +135,34 @@ export async function autoCacheTiles(routePoints: any[]) {
 }
 
 /**
- * 滞在時間更新（生活圏判定）
+ * 滞在時間の加算 (15〜30分に1回呼ばれる想定)
  */
-export async function updateStayStats(latitude: number, longitude: number) {
-  try {
-    const db = await LocalDB.init();
-    const meshId = `${latitude.toFixed(2)}:${longitude.toFixed(2)}`;
-    const now = new Date().toISOString();
+export async function updateStayStats(
+  lat: number,
+  lon: number,
+  hours: number = 0.5,
+) {
+  const db = await LocalDB.init();
+  // 座標を少し丸める（約1km四方のメッシュ単位にする）
+  const meshId = `${lat.toFixed(2)}:${lon.toFixed(2)}`;
 
-    await db.runAsync(
-      `INSERT INTO stay_stats (mesh_id, total_hours, last_stayed_at) 
-       VALUES (?, 0.25, ?)
-       ON CONFLICT(mesh_id) DO UPDATE SET 
-       total_hours = total_hours + 0.25,
-       last_stayed_at = ?;`,
-      [meshId, now, now],
-    );
-  } catch (err) {
-    console.warn("Stats update failed", err);
-  }
+  await db.runAsync(
+    `INSERT INTO stay_stats (mesh_id, total_hours, last_stayed_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(mesh_id) DO UPDATE SET 
+     total_hours = total_hours + ?, 
+     last_stayed_at = ?;`,
+    [meshId, hours, new Date().toISOString(), hours, new Date().toISOString()],
+  );
 }
 
 /**
- * スマートキャッシュ実行
+ * 自動スマート・キャッシュ（Wi-Fi時のみ呼び出される）
  */
 export async function smartAutoCache() {
   try {
     const db = await LocalDB.init();
+    // 滞在10時間以上の未キャッシュ地点を取得
     const targets: any[] = await db.getAllAsync(
       "SELECT mesh_id FROM stay_stats WHERE total_hours >= 10 AND is_cached = 0 LIMIT 1",
     );
@@ -162,18 +172,32 @@ export async function smartAutoCache() {
     const meshId = targets[0].mesh_id;
     const [lat, lon] = meshId.split(":").map(Number);
 
-    // ★改善点：単なる2点ではなく、中心周囲の点リストを渡す
-    const cacheArea = [
-      { latitude: lat, longitude: lon },
-      { latitude: lat + 0.005, longitude: lon + 0.005 },
-      { latitude: lat - 0.005, longitude: lon - 0.005 },
-    ];
-
+    // --- ① 地図タイルのキャッシュ (既存処理) ---
+    const cacheArea = [{ latitude: lat, longitude: lon }];
     await autoCacheTiles(cacheArea);
+
+    // --- ② 【追加】その場所からの「避難ルート」もAPIで取得してSQLiteへ ---
+    const baseUrl = getBaseUrl();
+    const testUserId = "11111111-1111-1111-1111-111111111111";
+
+    // APIに「この地点(lat,lon)からのルートをくれ」とリクエスト（API側の対応が必要）
+    const response = await fetch(
+      `${baseUrl}/map/my-plan/${testUserId}?lat=${lat}&lon=${lon}`,
+      {
+        headers: API_HEADERS,
+      },
+    );
+    const data = await response.json();
+
+    if (data.status === "success") {
+      // 保存！ (LocalDBに mesh_id ごとに保存するメソッドがあるとベスト)
+      await LocalDB.saveMyEvacuationPlan(data.plan);
+    }
 
     await db.runAsync("UPDATE stay_stats SET is_cached = 1 WHERE mesh_id = ?", [
       meshId,
     ]);
+    console.log(`✅ 生活圏(${meshId})の地図とルートをすべて備蓄しました`);
   } catch (err) {
     console.error("SmartAutoCache error:", err);
   }
@@ -274,4 +298,50 @@ export function checkShelterArrival(currentPos: any, destination: any) {
   if (distance < 50) return "ARRIVED"; // 50m以内で到着
   if (distance < 200) return "NEARBY"; // 200m以内で接近通知
   return "NAVIGATING";
+}
+
+/**
+ * デバッグ用: 保存されているファイルパスのリストをコンソールに出す
+ */
+export async function debugListCachedFiles() {
+  try {
+    const tilesDir = `${FileSystem.documentDirectory}tiles/`;
+    const zFolders = await FileSystem.readDirectoryAsync(tilesDir);
+    console.log("📂 保存済みズームレベル:", zFolders);
+
+    // 最初のズームレベルの中身を1つだけ見る
+    if (zFolders.length > 0) {
+      const xFolders = await FileSystem.readDirectoryAsync(
+        `${tilesDir}${zFolders[0]}/`,
+      );
+      console.log(`📂 Z:${zFolders[0]} 内の Xフォルダ数: ${xFolders.length}`);
+    }
+  } catch (e) {
+    console.log("📂 タイルフォルダがまだ存在しません");
+  }
+}
+
+/**
+ * 最も近い点の「配列番号（index）」を返すように改良
+ */
+export function findNearestPointIndex(origin: any, points: any[]) {
+  if (!points || points.length === 0) return -1;
+
+  let nearestIndex = 0;
+  let minDistance = Infinity;
+
+  points.forEach((point, index) => {
+    const dist = getDistance(
+      origin.latitude,
+      origin.longitude,
+      point.latitude,
+      point.longitude,
+    );
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearestIndex = index;
+    }
+  });
+
+  return nearestIndex;
 }

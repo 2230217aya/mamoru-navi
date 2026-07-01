@@ -18,7 +18,7 @@ import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // タイル保存先確認用
-import { documentDirectory } from "expo-file-system";
+import * as ExpoFileSystem from "expo-file-system";
 
 // ===== React Native =====
 import {
@@ -31,6 +31,7 @@ import {
   Image,
   Modal,
   Animated,
+  Platform,
 } from "react-native";
 
 // ===== React =====
@@ -41,12 +42,22 @@ import EmergencyAlertBanner from "../components/home/EmergencyAlertBanner";
 
 // --- SQLite ---
 import { LocalDB } from "@/src/db/database";
-import { convertGeoJsonToMapPoints } from "@/src/utils/mapUtils";
+import {
+  convertGeoJsonToMapPoints,
+  findNearestPointIndex,
+  getDistance,
+} from "@/src/utils/mapUtils";
 
 import Constants from "expo-constants";
 
 // ===== ネットワーク状態 =====
 import * as Network from "expo-network";
+
+// ===== baseAPIまとめ =====
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
+
+// watchHeadingAsync のために必要
+import * as Location from "expo-location";
 
 // ===== モード定義 =====
 const MODES = {
@@ -104,80 +115,86 @@ const MOCK_OFFICE_SERVICES: OfficeService[] = [
 // コンポーネント自体を any でキャストして使う
 const RootView = GestureHandlerRootView as any;
 
+// frontend/src/screens/UserHomeScreen.tsx
+
 export default function UserHome() {
-  // ===== 詳細モーダル表示状態 =====
-  const [showDetail, setShowDetail] = useState(false);
-
-  // ===== BottomSheet表示状態 =====
+  // ---------------------------------------------------------
+  // 1. 画面表示・UI状態 (States)
+  // ---------------------------------------------------------
+  const [mode, setMode] = useState(MODES.NORMAL); // 平常/災害モード
   const [showBottomSheet, setShowBottomSheet] = useState(false);
-
-  // ===== 選択されたクイック検索 =====
+  const [showDetail, setShowDetail] = useState(false);
+  const [loading, setLoading] = useState(false); // 通信中フラグ
+  const [lastUpdate, setLastUpdate] = useState(""); // 最終更新時刻
   const [selectedQuickSearch, setSelectedQuickSearch] = useState<string | null>(
     null,
   );
-  // ===== 現在モード =====
-  const [mode, setMode] = useState(MODES.NORMAL);
 
-  // ===== 施設サービス一覧 =====
-  const [officeServices, setOfficeServices] = useState<OfficeService[]>([]);
+  // ---------------------------------------------------------
+  // 2. ナビゲーション・地図状態 (Navigation States)
+  // ---------------------------------------------------------
+  const [isOnline, setIsOnline] = useState(true); // ネットワーク(赤/オレンジ判定)
+  const [origin, setOrigin] = useState({
+    latitude: 34.6937,
+    longitude: 135.5023,
+  }); // 現在地
+  const [destination, setDestination] = useState<any>(null); // 避難所
+  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]); // 全経路
+  const [distanceToGoal, setDistanceToGoal] = useState<number | null>(null); // 残り距離
+  const [isArrived, setIsArrived] = useState(false); // 到着判定フラグ
+  const [heading, setHeading] = useState<number>(0); // デバイスの向き(0-359度)自分の歩いている方向が分かるようにする
 
-  // ===== MapView参照 =====
+  // ---------------------------------------------------------
+  // 3. 外部参照・固定データ (Refs & Constants)
+  // ---------------------------------------------------------
   const mapRef = useRef<MapView | null>(null);
-
-  // ===== ローディング状態 =====
-  const [loading, setLoading] = useState(false);
-
-  // ===== 最終更新時刻 =====
-  const [lastUpdate, setLastUpdate] = useState("");
-
-  // ===== 施設位置 =====
-  const [facilityLocation, setFacilityLocation] = useState({
+  const [officeServices, setOfficeServices] = useState<OfficeService[]>([]); // 施設情報
+  const [facilityLocation] = useState({
     latitude: 34.6937,
     longitude: 135.5023,
   });
 
-  // ===== 現在地・避難所・ルートを「状態」として定義 =====
-  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]); // これで setRouteCoordinates が使えるようになります
+  // タイル保存先のパス設定
+  const TILE_DIR = (ExpoFileSystem as any).documentDirectory?.endsWith("/")
+    ? (ExpoFileSystem as any).documentDirectory
+    : `${(ExpoFileSystem as any).documentDirectory}/`;
+  const TILE_PATH = `${TILE_DIR}tiles/{z}/{x}/{y}.png`;
 
-  // オフライン地図タイルの保存先ディレクトリ
-  const TILE_PATH = `${documentDirectory || ""}tiles/{z}/{x}/{y}.png`;
+  // ---------------------------------------------------------
+  // 4. 動的計算 (Computed Values) ★ ここが「先のルートだけ」の肝
+  // ---------------------------------------------------------
+  // 現在地から一番近い点のインデックスを探す
+  const nearestIdx = findNearestPointIndex(origin, routeCoordinates);
 
-  const [origin, setOrigin] = useState({
-    latitude: 34.706443,
-    longitude: 135.503214,
-  });
+  // 一番近い点から最後（避難所）までのルートだけを抽出（過去の道をカット）
+  const remainingRoute =
+    nearestIdx !== -1 ? routeCoordinates.slice(nearestIdx) : routeCoordinates;
 
-  const [destination, setDestination] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  // ---------------------------------------------------------
+  // 5. API通信関数 (Data Fetching)
+  // ---------------------------------------------------------
 
-  const [routeSource, setRouteSource] = useState("");
-
-  // ===== 現在地から避難所までの残り距離を画面上に表示・管理するための状態 =====
-  const [distanceToGoal, setDistanceToGoal] = useState<number | null>(null);
-
-  // ===== 避難所到着判定 =====
-  const [isArrived, setIsArrived] = useState(false);
-
-  // ===== ネットワーク状態 =====
-  const [isOnline, setIsOnline] = useState(true);
-
-  // ===== API取得 =====
+  /**
+   * 平常時：避難所混雑状況の取得
+   */
   const fetchOfficeServices = async () => {
     try {
-      // ===== ローディング開始 =====
       setLoading(true);
+      const baseUrl = getBaseUrl();
+      const response = await fetch(`${baseUrl}/shelters/crowd-counts`, {
+        method: "GET",
+        headers: API_HEADERS,
+      });
 
-      // ===== 今後API接続予定 =====
-      // const response = await axios.get(...)
+      if (!response.ok) throw new Error("平常時APIエラー");
+      const result = await response.json();
 
-      // ===== 仮データ使用 =====
-      const data = MOCK_OFFICE_SERVICES;
+      if (result.crowd_counts) {
+        setOfficeServices(result.crowd_counts);
+      } else {
+        setOfficeServices(MOCK_OFFICE_SERVICES);
+      }
 
-      setOfficeServices(data);
-
-      // ===== 更新時間保存 =====
       setLastUpdate(
         new Date().toLocaleTimeString("ja-JP", {
           hour: "2-digit",
@@ -185,113 +202,100 @@ export default function UserHome() {
         }),
       );
     } catch (error) {
-      // ===== エラー表示 =====
-      console.log(error);
+      console.log("❌ 平常時APIエラー:", error);
+      setOfficeServices(MOCK_OFFICE_SERVICES);
     } finally {
-      // ===== ローディング終了 =====
       setLoading(false);
     }
   };
 
-  // ===== ★ オフライン避難計画の読み込み関数 =====
-  // frontend/src/screens/UserHomeScreen.tsx
-
-  // frontend/src/screens/UserHomeScreen.tsx
-
+  /**
+   * 災害時：避難計画（ルート）の取得
+   */
   const loadEvacuationPlan = async () => {
+    // 取得前に表示をクリア
     setRouteCoordinates([]);
     setDestination(null);
 
-    const testUserId = "test-user-id-1234";
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-    const baseUrl = process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-
+    const testUserId = "11111111-1111-1111-1111-111111111111";
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // タイムアウトを3秒に少し伸ばす
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     try {
-      console.log("📡 [LOG] 取得開始...");
-      const response = await fetch(`${baseUrl}/map/my-plan/${testUserId}`, {
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        `${getBaseUrl()}/map/my-plan/${testUserId}`,
+        {
+          headers: API_HEADERS,
+          signal: controller.signal,
+        },
+      );
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) throw new Error("API ERROR");
+      if (!response.ok) throw new Error("ServerDown");
 
       const data = await response.json();
-
-      if (data.status === "success" && data.plan.route_data) {
-        console.log("✅ オンライン成功");
-        setIsOnline(true); // ★ ここでオンラインを確定
+      if (data && data.status === "success" && data.plan) {
+        console.log("✅ オンライン成功（赤色表示）");
+        setIsOnline(true);
         const points = convertGeoJsonToMapPoints(data.plan.route_data);
         setRouteCoordinates(points);
         if (points.length > 0) setDestination(points[points.length - 1]);
         await LocalDB.saveMyEvacuationPlan(data.plan);
-        return;
       }
+      clearTimeout(timeoutId);
     } catch (error) {
       clearTimeout(timeoutId);
-      console.log("⚠️ SQLiteモードへ強制移行");
-      setIsOnline(false); // ★ APIに失敗した＝オフライン扱いにする
+      console.log("⚠️ オフライン：オレンジ色表示へ切り替え");
+      setIsOnline(false);
+      // UserHomeScreen.tsx 内 loadEvacuationPlan の catch ブロック内
 
-      const cachedPlan = await LocalDB.getMyEvacuationPlan(testUserId);
-      if (cachedPlan && cachedPlan.route_data) {
-        const points = convertGeoJsonToMapPoints(cachedPlan.route_data);
+      // 1. 全保存プランを取得
+      const cachedPlans = await LocalDB.getAllSavedPlans();
+
+      if (!cachedPlans || cachedPlans.length === 0) {
+        console.log("❌ SQLiteにもデータがありません");
+        return;
+      }
+
+      // 2. 最適なプランを選ぶIf文ロジック
+      let bestPlan: any = null; // ★ bestPlan に any または具体的な型を付ける
+      let minDistance = Infinity;
+
+      // ★ plan に明示的に any を付けることで 'never' エラーを回避
+      cachedPlans.forEach((plan: any) => {
+        if (plan.route_data && plan.route_data.coordinates) {
+          const start = plan.route_data.coordinates[0];
+          const dist = getDistance(
+            origin.latitude,
+            origin.longitude,
+            start[1], // 緯度
+            start[0], // 経度
+          );
+
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestPlan = plan;
+          }
+        }
+      });
+
+      // 3. 発動
+      if (bestPlan) {
+        const points = convertGeoJsonToMapPoints(bestPlan.route_data);
         setRouteCoordinates(points);
         if (points.length > 0) setDestination(points[points.length - 1]);
-        console.log("✅ オフライン表示成功");
+        console.log("✅ オフライン：最適な予備ルートを表示しました");
       }
     }
   };
 
-  // ===== 初期読み込み =====
-  useEffect(() => {
-    fetchOfficeServices();
-  }, []);
-
-  useEffect(() => {
-    const check = async () => {
-      const state = await Network.getNetworkStateAsync();
-      setIsOnline(state.isConnected && state.isInternetReachable);
-    };
-    check();
-  }, [mode]); // モード切替時にネットワークも再確認
-
-  useEffect(() => {
-    // 災害モードで、かつ現在地と目的地が両方あるときだけ計算する
-    if (mode === MODES.DISASTER && destination && origin) {
-      const { getDistance } = require("@/src/utils/mapUtils"); // 以前作った関数を呼ぶ
-
-      const dist = getDistance(
-        origin.latitude,
-        origin.longitude,
-        destination.latitude,
-        destination.longitude,
-      );
-
-      // 計算した距離(メートル)をStateに入れる
-      setDistanceToGoal(Math.round(dist));
-
-      // 到着判定：50m以内 かつ まだモーダルを出していない場合
-      if (dist < 50 && !isArrived) {
-        setIsArrived(true);
-      }
-    } else {
-      // 災害モードじゃないときはリセット
-      setDistanceToGoal(null);
-    }
-  }, [origin, destination, mode]); // origin, destination, mode が変わるたびに動く
-
-  // ===== 市区役所へ移動 =====
+  // ---------------------------------------------------------
+  // 6. 地図操作関数 (Map Actions)
+  // ---------------------------------------------------------
   const moveToCityHall = () => {
     mapRef.current?.animateToRegion(
       {
         latitude: 34.6937,
         longitude: 135.5023,
-
-        // ===== 地図拡大率 =====
         latitudeDelta: 0.002,
         longitudeDelta: 0.002,
       },
@@ -299,81 +303,215 @@ export default function UserHome() {
     );
   };
 
+  // ---------------------------------------------------------
+  // 7. 副作用監視 (Side Effects)
+  // ---------------------------------------------------------
+
+  // A. マウント時初期化
+  useEffect(() => {
+    fetchOfficeServices();
+    loadEvacuationPlan(); // 事前の備蓄を試みる
+  }, []);
+
+  // B. ネットワーク状態の監視
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const state = await Network.getNetworkStateAsync();
+      setIsOnline(!!(state.isConnected && state.isInternetReachable));
+    };
+    checkNetwork();
+  }, [mode]); // モード切替時にネットワークも再確認
+
+  // C. 災害時の動的HUD・距離更新（1秒毎や移動毎に発火）
+  useEffect(() => {
+    if (mode !== MODES.DISASTER || !destination || !origin) {
+      setDistanceToGoal(null);
+      return;
+    }
+
+    const { getDistance } = require("@/src/utils/mapUtils");
+    const dist = getDistance(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+    const roundedDist = Math.round(dist);
+
+    setDistanceToGoal(roundedDist);
+
+    // 到着判定：一度切りだけ発動
+    if (roundedDist < 50 && !isArrived) {
+      setIsArrived(true);
+    }
+  }, [origin, destination, mode, isArrived]);
+
+  // Ⅾ. デバイスの向き（コンパス）監視
+  useEffect(() => {
+    let headingSubscription: any;
+
+    const startHeadingWatch = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+
+      // デバイスのコンパス（磁気センサー）を監視
+      headingSubscription = await Location.watchHeadingAsync(
+        (data: Location.LocationHeadingObject) => {
+          // コンパスの角度をStateに保存
+          setHeading(data.trueHeading);
+        },
+      );
+    };
+
+    startHeadingWatch();
+
+    // クリーンアップ処理
+    return () => {
+      if (headingSubscription) {
+        headingSubscription.remove();
+      }
+    };
+  }, []);
+
+  // E. 現在地の監視（1秒ごと or 1m移動ごと）
+  useEffect(() => {
+    let locationSubscription: any;
+
+    const startLocationTracking = async () => {
+      // 1. 権限チェック
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        console.log("位置情報の権限がありません");
+        return;
+      }
+
+      // 2. 位置情報の継続監視（1秒ごと or 1m移動ごとに発動）
+      locationSubscription = await Location.watchPositionAsync(
+        {
+          // 避難用なので高精度モード
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 5000, // 5000ミリ秒ごとに更新
+          distanceInterval: 3, // 3メートル移動するごとに更新
+        },
+        (location: Location.LocationObject) => {
+          // ★ ここで origin ステートを更新する！
+          const newCoords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+          setOrigin(newCoords); // これでHUDの距離や点線がリアルタイムに動きます
+          console.log("📍 現在地更新:", newCoords);
+        },
+      );
+    };
+
+    startLocationTracking();
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, []);
+
+  // ---------------------------------------------------------
+  // 8. 描画 (Render)
+  // ---------------------------------------------------------
+
   return (
     <RootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
-        {/* ===== 地図 ===== */}
+        {/* ===== 地図本体 ===== */}
         <MapView
           ref={mapRef}
           style={styles.map}
           initialRegion={{
             latitude: facilityLocation.latitude,
             longitude: facilityLocation.longitude,
-
-            // ===== 初期地図拡大率 =====
             latitudeDelta: 0.002,
             longitudeDelta: 0.002,
           }}
+          // ★ ここから下が「ナビ仕様」の設定
+          showsCompass={true} // 地図が回転したときにコンパス（指針）を表示
+          rotateEnabled={true} // 2本指での地図回転を許可
+          pitchEnabled={true} // 2本指でスワイプして地図を傾ける(3D表示)を許可
+          scrollEnabled={true} // 地図のスクロールを許可
+          showsUserLocation={false} // 自作の「回転する矢印」を使うので、標準の青丸は消す
+          followsUserLocation={false} // ★ 勝手に地図が動かないように(手動操作を優先)
+          showsMyLocationButton={true} // ★ 右下に「現在地へ戻る」ボタンを出す
+          mapPadding={{ top: 50, right: 10, bottom: 10, left: 10 }} // UIに重ならないよう調整
         >
-          {/* オフライン用の地図背景設定 */}
-          <UrlTile
-            /**
-             * isOnline が true ならネットから最新タイルを。
-             * fetch が失敗して isOnline が false になったらスマホ内のタイルを探しに行きます。
-             */
-            urlTemplate={
-              mode === MODES.DISASTER && !isOnline
-                ? `file://${TILE_PATH}`
-                : "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            }
-            zIndex={-1}
-            tileSize={256}
-          />
-
+          {mode === MODES.DISASTER && !isOnline && (
+            <UrlTile
+              key="offline-tile"
+              urlTemplate={
+                mode === MODES.DISASTER && !isOnline
+                  ? `file://${TILE_PATH}`
+                  : "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              }
+              zIndex={-1}
+              tileSize={256}
+            />
+          )}
           {mode === MODES.NORMAL ? (
-            // ===== 平常モード施設マーカー =====
+            // ===== 2. 平常モード：施設マーカーのみ表示 =====
             <Marker
               coordinate={facilityLocation}
               title="大阪市役所"
               description="公共施設"
             />
           ) : (
+            // ===== 3. 災害モード：ナビゲーション表示（複数重ねる） =====
             <>
-              {/* ===== 現在地マーカー ===== */}
+              {/* ① [線] 避難ルート本体：remainingRoute（自分より先）だけを表示 */}
+              {remainingRoute.length > 0 && (
+                <Polyline
+                  coordinates={remainingRoute} // routeCoordinates を remainingRoute に変更
+                  strokeColor={isOnline ? "#ff3b30" : "#E67E22"}
+                  strokeWidth={6}
+                  zIndex={5}
+                />
+              )}
+
+              {/* ② [線] 【誘導ロジック】現在地からルート入口までの「動く点線」 */}
+              {destination && (
+                <Polyline
+                  coordinates={[
+                    origin, // 現在地
+                    // remainingRouteの先頭（＝今一番近い場所）へ結ぶ
+                    remainingRoute[0] || destination,
+                  ]}
+                  strokeColor={isOnline ? "#007AFF" : "#FF9500"}
+                  strokeWidth={5}
+                  lineDashPattern={[6, 6]}
+                  zIndex={6}
+                />
+              )}
+
+              {/* ③ [点] 現在地マーカー */}
               <Marker
                 coordinate={origin}
-                title="現在地"
-                description="ユーザー位置"
-              />
+                anchor={{ x: 0.5, y: 0.5 }} // 中心を軸に回転させる
+                flat={true} // 地図を傾けてもマーカーが垂直に立たないようにする
+                zIndex={10}
+              >
+                {/* ★ ここから中身をカスタムアイコンに変更 ★ */}
+                <View style={{ transform: [{ rotate: `${heading}deg` }] }}>
+                  {/* navigation アイコンは三角形の矢印なので、方位表示に最適です */}
+                  <Ionicons name="navigate" size={32} color="#007AFF" />
+                </View>
+              </Marker>
 
-              {/* ===== 避難所マーカー ===== */}
-              {mode === MODES.DISASTER && destination && (
+              {/* ④ [点] 避難所マーカー（色の更新を強制） */}
+              {destination && (
                 <Marker
+                  key={`shelter-marker-${isOnline ? "online" : "offline"}`}
                   coordinate={destination}
-                  // isOnline が false になっていればオレンジになるはずです
                   pinColor={isOnline ? "red" : "orange"}
-                  title="避難所"
-                  description={isOnline ? "最新情報" : "オフラインデータ"}
+                  title="指定避難所"
+                  zIndex={10}
                 />
               )}
-
-              {/* ===== 現在地から避難ルート入口までの誘導線（点線） ===== */}
-              {/* 災害モードで、かつ現在地とルートデータが両方ある場合のみ表示 */}
-              {mode === MODES.DISASTER && routeCoordinates.length > 0 && (
-                <Polyline
-                  coordinates={[origin, routeCoordinates[0]]} // 現在地から、保存済みルートの1点目を結ぶ
-                  strokeColor="#888" // 目立ちすぎないグレー
-                  strokeWidth={3}
-                  lineDashPattern={[5, 5]} // 点線にする設定
-                />
-              )}
-
-              {/* ===== 避難ルート ===== */}
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeColor="#ff3b30"
-                strokeWidth={5}
-              />
             </>
           )}
         </MapView>
@@ -463,6 +601,7 @@ export default function UserHome() {
             {QUICK_SEARCH_ITEMS.map((item) => (
               <TouchableOpacity
                 key={item.id}
+                // クイック検索ボタンの選択状態を判定する場所
                 style={[
                   styles.quickSearchButton,
                   selectedQuickSearch === item.title &&
@@ -987,9 +1126,9 @@ const styles = StyleSheet.create({
   },
   navInfoPanel: {
     position: "absolute",
-    top: 170, // モード切替コンテナの下あたりに配置
+    top: 250, // ★170から250くらいに下げると、開発ボタン(180)の下に綺麗に並びます
     right: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.75)", // 半透明の黒
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
     padding: 12,
     borderRadius: 16,
     alignItems: "center",

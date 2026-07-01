@@ -20,11 +20,24 @@ import { convertGeoJsonToMapPoints } from "@/src/utils/mapUtils";
 import { autoCacheTiles } from "@/src/utils/mapUtils";
 import { calculateSafetyPercentage } from "@/src/utils/mapUtils";
 
+import * as FileSystem from "expo-file-system/legacy";
+
+// 修正箇所：database.ts または mapUtils.ts
+// フォルダごと消去する関数
+export async function clearAllTiles() {
+  const tilesDir = `${FileSystem.documentDirectory}tiles/`;
+  const info = await FileSystem.getInfoAsync(tilesDir);
+  if (info.exists) {
+    await FileSystem.deleteAsync(tilesDir);
+    console.log("🗑️ 警告入りタイル画像を全て削除しました");
+  }
+}
+
 export default function SafetyScreen() {
   // オフラインデータの充実度（安心度）
   const [safetyPercent, setSafetyPercent] = useState(0);
   // テスト用のダミーユーザーIDを使用（実際はログイン中のユーザーIDを使います）
-  const testUserId = "test-user-id-1234";
+  const testUserId = "11111111-1111-1111-1111-111111111111";
 
   // 安心度を最新に更新する関数
   const refreshSafetyMetrics = async () => {
@@ -40,12 +53,32 @@ export default function SafetyScreen() {
   // --- データダウンロード処理 ---
   const handleDownloadMyPlan = async () => {
     try {
+      // URLの取得（USB/Hotspot両対応に寄せる）
       const debuggerHost = Constants.expoConfig?.hostUri;
       const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-      const baseUrl =
-        process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
 
-      const res = await fetch(`${baseUrl}/map/my-plan/${testUserId}`);
+      // ★ 修正：USB接続なら localhost を、無線なら localIp を使う
+      const baseUrl =
+        localIp === "localhost" || localIp.includes("10.144")
+          ? "http://localhost:8000"
+          : `http://${localIp}:8000`;
+
+      console.log(`📡 手動ダウンロード試行: ${baseUrl}`);
+
+      // 重い処理なので、タイムアウトを長め(10秒)に取る
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(`${baseUrl}/map/my-plan/${testUserId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Bypass-Tunnel-Reminder": "true", // ★ これを追加するとあの画像が消えます
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       const data = await res.json();
 
       if (data.status === "success") {
@@ -72,7 +105,7 @@ export default function SafetyScreen() {
   // --- ローカルからの読み込みテスト処理 ---
   const handleLoadMyPlan = async () => {
     try {
-      const testUserId = "test-user-id-1234";
+      const testUserId = "11111111-1111-1111-1111-111111111111";
       const plan = await LocalDB.getMyEvacuationPlan(testUserId);
 
       if (plan && plan.route_data) {
@@ -130,7 +163,13 @@ export default function SafetyScreen() {
   const handleReset = async () => {
     await LocalDB.resetDatabaseForTest();
     await refreshSafetyMetrics(); // 0%に戻るはず
+    await clearAllTiles(); // タイル画像も削除
     Alert.alert("クリア", "データを削除しました。0%からテストできます。");
+  };
+
+  const handleSetupTest = async () => {
+    await LocalDB.setupTestStayStats();
+    Alert.alert("デバッグ", "自宅と職場の滞在実績(10h)を注入しました。");
   };
 
   return (
@@ -292,6 +331,18 @@ export default function SafetyScreen() {
 
         <TouchableOpacity style={styles.areaButton}>
           <Text style={styles.areaText}>🏡 実家周辺（半径3 km）</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.downloadButton,
+            { backgroundColor: "#666", marginTop: 10 },
+          ]}
+          onPress={handleSetupTest}
+        >
+          <Text style={styles.downloadText}>
+            【デバッグ】滞在実績を偽装する
+          </Text>
         </TouchableOpacity>
       </View>
       {/* オフラインデータ情報 */}

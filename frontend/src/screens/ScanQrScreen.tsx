@@ -13,6 +13,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database"; // ★LocalDBをインポート
 import * as Crypto from "expo-crypto"; // ★UUID生成のために追加 (npx expo install expo-crypto)
+import Constants from "expo-constants";
 
 export default function ScanQRScreen() {
   const router = useRouter();
@@ -57,9 +58,17 @@ export default function ScanQRScreen() {
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     try {
+      const debuggerHost = Constants.expoConfig?.hostUri;
+      const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+
       const baseUrl =
         process.env.EXPO_PUBLIC_API_URL ||
-        "https://mamoru-navi-api-aya223.loca.lt";
+        (localIp === "localhost" || localIp === "127.0.0.1"
+          ? "http://localhost:8000"
+          : `http://${localIp}:8000`);
+
+      console.log(`📡 [Scan] 接続先: ${baseUrl}/scan/qr-code`);
+
       const response = await fetch(`${baseUrl}/scan/qr-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +77,7 @@ export default function ScanQRScreen() {
           scan_mode: STAFF_CONFIG.scan_mode,
           location_id: STAFF_CONFIG.location_id,
         }),
-        signal: controller.signal, // ★ 3. fetchにキャンセルの合図を受け取る設定を追加
+        signal: controller.signal,
       });
 
       // 通信が間に合ったらタイマーを解除

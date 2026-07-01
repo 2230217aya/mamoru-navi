@@ -400,72 +400,59 @@ def get_shelter_heatmap_data():
 
 # get_my_evacuation_plan
 
+
 @app.get("/map/my-plan/{user_id}")
 def get_my_evacuation_plan(user_id: str):
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
+    conn = None
     try:
-        # 1. ユーザーの現在地に最も近い「道路の点(Node)」と「最寄りの避難所」を特定
+        conn = get_db_connection()
+        import psycopg2.extras
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # 1. ユーザーの現在位置を取得（ここが空だと500になりやすい）
+        cur.execute("SELECT ST_X(location::geometry) as lon, ST_Y(location::geometry) as lat FROM user_locations WHERE user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
+        u_loc = cur.fetchone()
+        if not u_loc:
+             # ★ 犯人候補1: ユーザーの位置情報がDBに1件もない
+             raise Exception(f"DEBUG: user_locations に user_id={user_id} のデータがありません。")
+
+        # 2. 経路計算の準備（ノード検索）
         cur.execute("""
-            WITH user_location AS (
-                -- 最後に記録されたユーザーの位置
-                SELECT location FROM user_locations WHERE user_id = %s ORDER BY recorded_at DESC LIMIT 1
-            ),
-            target_shelter AS (
-                -- ユーザーから最も近い避難所
-                SELECT shelter_id, name, latitude, longitude, location as geom
+            WITH target_shelter AS (
+                SELECT shelter_id, name, latitude, longitude,
+                       ST_SetSRID(ST_Point(longitude, latitude), 4326) as shelter_geom
                 FROM shelters
-                ORDER BY location <-> (SELECT location FROM user_location)
+                ORDER BY ST_SetSRID(ST_Point(longitude, latitude), 4326)::geography <-> 
+                         ST_SetSRID(ST_Point(%s, %s), 4326)::geography
                 LIMIT 1
             )
             SELECT 
-                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT location FROM user_location) LIMIT 1) as start_node,
-                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT geom FROM target_shelter) LIMIT 1) as end_node,
-                s.shelter_id, s.name as shelter_name, s.latitude, s.longitude
+                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> ST_SetSRID(ST_Point(%s, %s), 4326) LIMIT 1) as start_node,
+                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT shelter_geom FROM target_shelter) LIMIT 1) as end_node,
+                s.*
             FROM target_shelter s;
-        """, (user_id,))
+        """, (u_loc['lon'], u_loc['lat'], u_loc['lon'], u_loc['lat']))
         points = cur.fetchone()
 
-        if not points:
-             raise HTTPException(status_code=404, detail="現在地または避難所が見つかりません")
+        # 3. pgRouting実行
+        cur.execute("""
+            SELECT ST_AsGeoJSON(ST_Transform(ST_MakeLine(res.the_geom), 4326)) as geojson
+            FROM (
+                SELECT w.the_geom
+                FROM pgr_dijkstra(
+                    'SELECT gid as id, source, target, cost_s AS cost FROM ways WHERE cost_s > 0',
+                    %s, %s, directed := false
+                ) AS di
+                JOIN ways AS w ON di.edge = w.gid
+                ORDER BY di.seq
+            ) AS res;
+        """, (points['start_node'], points['end_node']))
+        route_result = cur.fetchone()
 
-        # 2. pgRouting を使って本物のルート(GeoJSON)を生成
-        # waysテーブルの the_geom(道路の形) をつなぎ合わせて LineString にする
-        try:
-            cur.execute("""
-                SELECT ST_AsGeoJSON(ST_Transform(ST_MakeLine(res.the_geom), 4326)) as geojson
-                FROM (
-                    SELECT w.the_geom
-                    FROM pgr_dijkstra(
-                        'SELECT id, source, target, cost_s AS cost FROM ways WHERE cost_s > 0',
-                        %s, %s, directed := false
-                    ) AS di
-                    JOIN ways AS w ON di.edge = w.id
-                    ORDER BY di.seq
-                ) AS res;
-            """, (points['start_node'], points['end_node']))
-            route_result = cur.fetchone()
-        except Exception as e:
-            print(f"⚠️ pgRouting 実行エラー: {e}")
-            route_result = None
-
-        # --- ★ ここから修正：フォールバック処理 ---
-        if not route_result or not route_result['geojson']:
-            print("⚠️ 道路網が見つからないため、直線ルートを生成します")
-            # 道路データがなくてもアプリがクラッシュしないように「点2つの直線」を返す
-            route_data = {
-                "type": "LineString",
-                "coordinates": [
-                    [135.5000, 34.7333], # 実際は現在地座標
-                    [points['longitude'], points['latitude']] # 避難所座標
-                ]
-            }
-        else:
-            import json
-            route_data = json.loads(route_result['geojson'])
-
-
+        import json
+        route_data = json.loads(route_result['geojson']) if route_result and route_result['geojson'] else {
+            "type": "LineString", "coordinates": [[u_loc['lon'], u_loc['lat']], [points['longitude'], points['latitude']]]
+        }
 
         return {
             "status": "success",
@@ -474,16 +461,19 @@ def get_my_evacuation_plan(user_id: str):
                 "user_id": user_id,
                 "primary_shelter_id": str(points['shelter_id']),
                 "route_data": route_data,
-                "meeting_point_name": points['shelter_name'],
-                "meeting_point_lat": points['latitude'],
-                "meeting_point_lon": points['longitude'],
+                "meeting_point_name": points['shelter_name'] if 'shelter_name' in points else points['name'],
+                "meeting_point_lat": float(points['latitude']),
+                "meeting_point_lon": float(points['longitude']),
                 "updated_at": datetime.now().isoformat()
             }
         }
 
     except Exception as e:
-        print(f"❌ Error during routing: {e}")
-        raise HTTPException(status_code=500, detail="経路計算エラーが発生しました")
+        # ★ ここが重要！エラーメッセージをそのまま HTTP 500 の detail として返す
+        import traceback
+        error_detail = f"Internal Error: {str(e)} \n {traceback.format_exc()}"
+        print(error_detail) # サーバー側のログにも出力
+        raise HTTPException(status_code=500, detail=error_detail)
     finally:
-        cur.close()
-        conn.close()
+        if conn:
+            conn.close()

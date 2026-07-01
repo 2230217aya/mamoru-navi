@@ -329,6 +329,27 @@ export class LocalDB {
     return result;
   }
 
+  /**
+   * SQLiteに保存されているすべての避難計画を取得する
+   * (If文で現在地に一番近いルートを選ぶために使用)
+   */
+  static async getAllSavedPlans() {
+    const db = await this.init();
+    // 全件取得
+    const results: any[] = await db?.getAllAsync(
+      "SELECT * FROM my_evacuation_plan;",
+    );
+
+    // JSON文字列になっている route_data をオブジェクトに戻して返す
+    return results.map((plan) => ({
+      ...plan,
+      route_data:
+        typeof plan.route_data === "string"
+          ? JSON.parse(plan.route_data)
+          : plan.route_data,
+    }));
+  }
+
   //データベースリセット
   // database.ts 内
   static async resetDatabaseForTest() {
@@ -338,5 +359,34 @@ export class LocalDB {
     await db.execAsync("DELETE FROM checkins;");
     await db.execAsync("DELETE FROM sync_queue;");
     console.log("🧹 テスト用：全データをクリアしました");
+  }
+
+  // frontend/src/db/database.ts 内の LocalDB クラスに追加
+
+  /**
+   * テスト用：生活圏の滞在データを強制的に作成する
+   */
+  static async setupTestStayStats() {
+    const db = await this.init();
+    try {
+      // 一旦既存のテストデータを消去（重複エラー防止）
+      await db?.runAsync(
+        "DELETE FROM stay_stats WHERE mesh_id IN ('34.73:135.50', '34.69:135.50');",
+      );
+
+      // 1. 自宅(mesh_A)の偽装
+      await db?.runAsync(
+        "INSERT INTO stay_stats (mesh_id, total_hours, is_cached) VALUES ('34.73:135.50', 10, 0);",
+      );
+
+      // 2. 職場(mesh_B)の偽装
+      await db?.runAsync(
+        "INSERT INTO stay_stats (mesh_id, total_hours, is_cached) VALUES ('34.69:135.50', 10, 0);",
+      );
+
+      console.log("🛠️ テスト用の滞在データをSQLiteに注入しました");
+    } catch (e) {
+      console.error("テストデータ注入失敗", e);
+    }
   }
 }
