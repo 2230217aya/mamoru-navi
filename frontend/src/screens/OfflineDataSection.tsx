@@ -10,8 +10,9 @@ import {
   View,
   TouchableOpacity,
   Switch,
-  
+  Alert,
 } from 'react-native';
+import Constants from 'expo-constants';
 
 export default function SafetyScreen() {
     // オフラインデータの充実度（安心度）
@@ -135,7 +136,10 @@ const safetyStatus = getSafetyStatus();
 
         </View>
         {/* 最新データ一括ダウンロード */}
-        <TouchableOpacity style={styles.downloadButton}>
+        <TouchableOpacity
+          style={styles.downloadButton}
+          onPress={fetchOfflineMapData}
+        >
           <Text style={styles.downloadText}>
             最新データを一括ダウンロード
           </Text>
@@ -256,6 +260,51 @@ const safetyStatus = getSafetyStatus();
 
   );
 }
+
+const getBaseUrl = () => {
+  const debuggerHost = Constants.expoConfig?.hostUri;
+  const localIp = debuggerHost ? debuggerHost.split(':')[0] : 'localhost';
+
+  return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+};
+
+const fetchOfflineMapData = async () => {
+  try {
+    const baseUrl = getBaseUrl();
+    const url = `${baseUrl}/offline/map-data`;
+
+    console.log('オフライン地図API通信先:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'bypass-tunnel-reminder': 'true',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('オフライン地図APIエラー:', response.status);
+      console.log('エラー詳細:', errorText);
+      Alert.alert('エラー', 'オフライン地図データの取得に失敗しました');
+      return;
+    }
+
+    const data = await response.json();
+
+    console.log('オフライン地図データ取得成功:', data);
+    console.log('避難所件数:', data.count);
+    console.log('避難所一覧:', data.shelters);
+
+    setSafetyPercent(100);
+
+    Alert.alert('取得成功', `避難所データを${data.count ?? 0}件取得しました`);
+  } catch (error) {
+    console.log('オフライン地図データ取得エラー:', error);
+    Alert.alert('エラー', '通信に失敗しました');
+  }
+};
 
 const styles = StyleSheet.create({
   container: {

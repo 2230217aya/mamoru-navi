@@ -14,9 +14,27 @@ export default function Index() {
         const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
         const baseUrl =
           process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-        const response = await fetch(`${baseUrl}/user/my-role`);
+        console.log("ロール取得API通信先:", `${baseUrl}/user/my-role`);
+        const response = await fetch(`${baseUrl}/user/my-role`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "bypass-tunnel-reminder": "true",
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log("Redirect APIエラー:", response.status);
+          console.log("エラー詳細:", errorText);
+
+          // /user/my-role が未実装または404の場合は、住民として進める
+          setRole("citizen");
+          return;
+        }
         const data = await response.json();
-        setRole(data.user_role);
+        const role = data.user_role === "staff" ? "staff" : "citizen"; // デフォルトは citizen
+        setRole(role);
       } catch (e) {
         console.error("Redirect Error:", e);
         setRole("citizen"); // エラー時はとりあえず住民

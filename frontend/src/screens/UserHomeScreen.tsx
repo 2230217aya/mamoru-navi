@@ -10,6 +10,8 @@ import { router } from 'expo-router';
 // ===== BottomSheet =====
 import HomeBottomSheet from '../components/home/HomeBottomSheet';
 
+import Constants from 'expo-constants';
+
 // ===== Reanimated =====
 import 'react-native-reanimated';
 
@@ -49,6 +51,15 @@ type OfficeService = {
   id: number;
   title: string;
   number: string;
+};
+
+type Shelter = {
+  shelter_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
 };
 
 // ===== クイック検索用の仮データ =====
@@ -108,6 +119,8 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
   // ===== 施設サービス一覧 =====
   const [officeServices, setOfficeServices] =
     useState<OfficeService[]>([]);
+
+  const [shelters, setShelters] = useState<Shelter[]>([]);
 
   // ===== MapView参照 =====
   const mapRef = useRef<MapView | null>(null);
@@ -174,6 +187,45 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
     },
   ];
 
+  const getBaseUrl = () => {
+      const debuggerHost = Constants.expoConfig?.hostUri;
+      const localIp = debuggerHost ? debuggerHost.split(':')[0] : 'localhost';
+      return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+  }
+
+  const fetchShelters = async () => {
+    try {
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/shelters/`;
+
+      console.log('オンライン避難所API通信先:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'bypass-tunnel-reminder': 'true',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('オンライン避難所APIエラー:', response.status);
+        console.log('エラー詳細:', errorText);
+        return;
+      }
+
+      const data = await response.json();
+
+      console.log('オンライン避難所データ取得成功:', data);
+      console.log('オンライン避難所件数:', data.length);
+
+      setShelters(data);
+    } catch (error) {
+      console.log('オンライン避難所データ取得エラー:', error);
+    }
+  };
+
   // ===== API取得 =====
   const fetchOfficeServices = async () => {
     try {
@@ -212,6 +264,7 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
   // ===== 初期読み込み =====
   useEffect(() => {
     fetchOfficeServices();
+    fetchShelters();
   }, []);
 
   // ===== 市区役所へ移動 =====
@@ -270,19 +323,26 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
               />
 
               {/* ===== 避難所マーカー ===== */}
-              <Marker
-                coordinate={destination}
-                pinColor="red"
-                title="避難所"
-                description="開設中"
-              />
+              {shelters.map((shelter) => (
+                <Marker
+                  key={shelter.shelter_id}
+                  coordinate={{
+                    latitude: shelter.latitude,
+                    longitude: shelter.longitude,
+                  }}
+                  pinColor="red"
+                  title={shelter.name}
+                  description={`${shelter.address} / 収容人数: ${shelter.capacity}人`}
+                />
+              ))}
 
-              {/* ===== 避難ルート ===== */}
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeColor="#1976d2"
-                strokeWidth={5}
-              />
+                {/* ===== 避難ルート ===== */}
+                <Polyline
+                  coordinates={routeCoordinates}
+                  strokeColor="#1976d2"
+                  strokeWidth={5}
+                />
+            
             </>
           )}
 

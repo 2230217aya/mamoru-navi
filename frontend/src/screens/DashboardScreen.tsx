@@ -107,11 +107,41 @@ export default function dashboard() {
     }
   };
 
+  const fetchOfflineMapData = async () => {
+    try {
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/offline/map-data`;
+
+      console.log("オフライン地図API通信先:", url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`オフライン地図APIエラー: ${response.status}`);
+        console.log("エラー詳細:", errorText);
+        return;
+      }
+
+      const data = await response.json();
+
+      console.log("オフライン地図データ取得成功:", data);
+      console.log("避難所件数:", data.count);
+      console.log("避難所一覧:", data.shelters);
+    } catch (error) {
+      console.log("オフライン地図データ取得エラー:", error);
+    }
+  };
+
   // --- 4. 画面を開いた時の処理 (useEffectを1つに統合) ---
   useEffect(() => {
     const fetchInitialData = async () => {
       await fetchCount(); // まず未送信件数を数える
       await silentDownloadUsers(); // 次に賢い自動ダウンロードを走らせる
+      await fetchOfflineMapData();
     };
 
     fetchInitialData();
