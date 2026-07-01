@@ -264,3 +264,17 @@ docker-compose exec frontend npx expo start --tunnel
 - [ ] Windows ファイアウォールが OFF になっているか？（特にパブリックネットワーク）
 - [ ] （パターンAの場合）スマホが PC のホットスポットに接続されているか？
 - [ ] （パターンBの場合）localtunnel コマンドを起動し続けているか？
+
+# 🗺️ まもるナビ 開発環境セットアップ
+
+### 地図データの準備
+
+1. 近畿エリアのOSMデータをダウンロードします
+   `curl -o kinki-latest.osm.pbf http://download.geofabrik.de/asia/japan/kinki-latest.osm.pbf`
+2. プロジェクトのルート（docker-compose.ymlと同じ場所）に置きます。
+
+### 起動
+
+```bash
+docker-compose up -d --build
+```
