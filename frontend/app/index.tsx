@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { View, ActivityIndicator, Text } from "react-native"; // Textを追加
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
 export default function Index() {
   const [role, setRole] = useState<string | null>(null);
@@ -12,24 +13,30 @@ export default function Index() {
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        const debuggerHost = Constants.expoConfig?.hostUri;
-        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+        // --- 1. 共通ユーティリティからベースURLを取得 ---
+        const baseUrl = getBaseUrl();
 
-        // RootLayoutと同じ判定ロジックを使う、または USB接続なら localhost に直書きする
-        const baseUrl =
-          localIp === "localhost" ||
-          localIp === "127.0.0.1" ||
-          localIp.includes("10.144")
-            ? "http://localhost:8000"
-            : `http://${localIp}:8000`;
+        console.log(`📡 [Index] ロール取得API通信先: ${baseUrl}/user/my-role`);
 
-        console.log(`📡 [Index] リクエスト送信先: ${baseUrl}/user/my-role`);
+        // --- 2. 共通ヘッダーを使ってリクエスト送信 ---
+        const response = await fetch(`${baseUrl}/user/my-role`, {
+          method: "GET",
+          headers: API_HEADERS, // bypass-tunnel-reminder もここに含まれています
+        });
 
-        const response = await fetch(`${baseUrl}/user/my-role`);
+        // --- 3. エラーハンドリング ---
+        if (!response.ok) {
+          console.log("⚠️ [Index] APIエラー:", response.status);
+          setRole("citizen"); // エラー時は住民としてフォールバック
+          return;
+        }
+
         const data = await response.json();
-
         console.log("✅ [Index] 取得成功:", data.user_role); // ロールの中身を確認
-        setRole(data.user_role);
+
+        // ロールを確定 (staff 以外はすべて citizen)
+        const finalRole = data.user_role === "staff" ? "staff" : "citizen";
+        setRole(finalRole);
       } catch (e) {
         console.error("❌ [Index] Redirect Error:", e);
         setRole("citizen"); // エラー時にフォールバック

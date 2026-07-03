@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { LocalDB } from "@/src/db/database";
 import Constants from "expo-constants";
-
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 import { convertGeoJsonToMapPoints } from "@/src/utils/mapUtils";
 import { autoCacheTiles } from "@/src/utils/mapUtils";
 import { calculateSafetyPercentage } from "@/src/utils/mapUtils";
@@ -34,6 +34,7 @@ export async function clearAllTiles() {
 }
 
 export default function SafetyScreen() {
+  // --- 安心度の計算 ---
   // オフラインデータの充実度（安心度）
   const [safetyPercent, setSafetyPercent] = useState(0);
   // テスト用のダミーユーザーIDを使用（実際はログイン中のユーザーIDを使います）
@@ -53,16 +54,7 @@ export default function SafetyScreen() {
   // --- データダウンロード処理 ---
   const handleDownloadMyPlan = async () => {
     try {
-      // URLの取得（USB/Hotspot両対応に寄せる）
-      const debuggerHost = Constants.expoConfig?.hostUri;
-      const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-
-      // ★ 修正：USB接続なら localhost を、無線なら localIp を使う
-      const baseUrl =
-        localIp === "localhost" || localIp.includes("10.144")
-          ? "http://localhost:8000"
-          : `http://${localIp}:8000`;
-
+      const baseUrl = getBaseUrl();
       console.log(`📡 手動ダウンロード試行: ${baseUrl}`);
 
       // 重い処理なので、タイムアウトを長め(10秒)に取る
@@ -71,10 +63,7 @@ export default function SafetyScreen() {
 
       const res = await fetch(`${baseUrl}/map/my-plan/${testUserId}`, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Bypass-Tunnel-Reminder": "true", // ★ これを追加するとあの画像が消えます
-        },
+        headers: API_HEADERS,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -124,6 +113,41 @@ export default function SafetyScreen() {
     } catch (error) {
       console.error(error);
       Alert.alert("エラー", "読み込み中にエラーが発生しました");
+    }
+  };
+
+  const fetchOfflineMapData = async () => {
+    try {
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/offline/map-data`;
+
+      console.log("オフライン地図API通信先:", url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: API_HEADERS,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log("オフライン地図APIエラー:", response.status);
+        console.log("エラー詳細:", errorText);
+        Alert.alert("エラー", "オフライン地図データの取得に失敗しました");
+        return;
+      }
+
+      const data = await response.json();
+
+      console.log("オフライン地図データ取得成功:", data);
+      console.log("避難所件数:", data.count);
+      console.log("避難所一覧:", data.shelters);
+
+      setSafetyPercent(100);
+
+      Alert.alert("取得成功", `避難所データを${data.count ?? 0}件取得しました`);
+    } catch (error) {
+      console.log("オフライン地図データ取得エラー:", error);
+      Alert.alert("エラー", "通信に失敗しました");
     }
   };
 
@@ -405,6 +429,13 @@ export default function SafetyScreen() {
     </ScrollView>
   );
 }
+
+const getBaseUrl = () => {
+  const debuggerHost = Constants.expoConfig?.hostUri;
+  const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+
+  return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+};
 
 const styles = StyleSheet.create({
   container: {

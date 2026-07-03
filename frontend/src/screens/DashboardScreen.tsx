@@ -16,6 +16,7 @@ import { LocalDB } from "@/src/db/database";
 import Constants from "expo-constants";
 import { Feather } from "@expo/vector-icons"; // Figmaと同じアップロードアイコン用
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
 // 設定時間（ミリ秒）
 const SYNC_INTERVAL = 10 * 1000; // 1時間 (テスト用に短くしてもOK)1 * 60 * 60 * 1000;
@@ -25,21 +26,6 @@ export default function dashboard() {
   // ★ 状態管理
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  //ベースURLを取得する関数（共通化用）
-  const getBaseUrl = () => {
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-    return (
-      process.env.EXPO_PUBLIC_API_URL ||
-      // 1. まず localIp が localhost ならそのまま localhost を使う
-      // 2. もしあなたが adb reverse を実行済みなら、スマホ内の localhost:8000 が PC に直結している
-      // 3. 他の人がモバイルスポット(192.x.x.x)を使っているなら、localIp は自動的にそのIPになる
-      (localIp === "localhost" || localIp === "127.0.0.1"
-        ? `http://localhost:8000`
-        : `http://${localIp}:8000`)
-    );
-  };
 
   //未送信件数取得
   const fetchCount = async () => {
@@ -84,7 +70,7 @@ export default function dashboard() {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: API_HEADERS,
       });
 
       // ★追加：エラーが返ってきた場合に理由を表示
@@ -115,11 +101,41 @@ export default function dashboard() {
     }
   };
 
+  const fetchOfflineMapData = async () => {
+    try {
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/offline/map-data`;
+
+      console.log("オフライン地図API通信先:", url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: API_HEADERS,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`オフライン地図APIエラー: ${response.status}`);
+        console.log("エラー詳細:", errorText);
+        return;
+      }
+
+      const data = await response.json();
+
+      console.log("オフライン地図データ取得成功:", data);
+      console.log("避難所件数:", data.count);
+      console.log("避難所一覧:", data.shelters);
+    } catch (error) {
+      console.log("オフライン地図データ取得エラー:", error);
+    }
+  };
+
   // --- 4. 画面を開いた時の処理 (useEffectを1つに統合) ---
   useEffect(() => {
     const fetchInitialData = async () => {
       await fetchCount(); // まず未送信件数を数える
       await silentDownloadUsers(); // 次に賢い自動ダウンロードを走らせる
+      await fetchOfflineMapData();
     };
 
     fetchInitialData();
@@ -173,7 +189,10 @@ export default function dashboard() {
   return (
     <View style={styles.container}>
       {/* 右上のアイコン */}
-      <Pressable onPress={() => router.push("/")} style={styles.userIconButton}>
+      <Pressable
+        onPress={() => router.push("../user-list")}
+        style={styles.userIconButton}
+      >
         <Image
           source={require("@/assets/images/dashboard-userIcon.png")}
           style={styles.userIcon}

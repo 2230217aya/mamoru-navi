@@ -144,6 +144,7 @@ export default function RootLayout() {
       });
 
     // 2. ロール取得
+    // 2. ロール取得
     const fetchUserRole = async () => {
       try {
         const response = await fetch(`${baseUrl}/user/my-role`, {
@@ -154,21 +155,34 @@ export default function RootLayout() {
           },
         });
 
+        if (!response.ok) {
+          // HTTPステータスが200以外（404, 500など）の場合の処理
+          const errorText = await response.text();
+          console.log(`⚠️ ロール取得APIエラー: ${response.status}`);
+
+          // APIが未実装（404）やエラーの場合は、一般住民（citizen）として進める
+          setUserRole("citizen");
+          return;
+        }
+
         const data = await response.json();
         if (data.status === "success") {
-          setUserRole(data.user_role);
-          console.log(`👤 ログインロール: ${data.user_role}`);
+          // "staff" かそれ以外（"citizen"）を正規化してセット
+          const role = data.user_role === "staff" ? "staff" : "citizen";
+          setUserRole(role);
+          console.log(`👤 ログイン成功 ロール: ${role}`);
         } else {
+          // statusがsuccessでない場合
           setUserRole("citizen");
         }
       } catch (error) {
         console.log(
-          "❌ ネットワークエラーにつき、オフラインモードで開始します",
+          "❌ ネットワークエラー：オフラインモード(一般住民)で開始します",
         );
-        setUserRole("citizen"); // ★ここが重要：エラーでも必ずセットする
+        // ネットワーク断絶時もアプリが止まらないよう、必ずフォールバックする
+        setUserRole("citizen");
       }
     };
-
     fetchUserRole();
 
     // 3. 同期ロジック (checkAndSync)

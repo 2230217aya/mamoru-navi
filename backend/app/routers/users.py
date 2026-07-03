@@ -4,18 +4,30 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
 import uuid
-from database import get_db_connection
-from psycopg2.extras import RealDictCursor
+from database import get_db
 
 # APIRouterのインスタンスを作成
 # これが「ユーザー関連」のエンドポイントをまとめるルーターになります。
 router = APIRouter(
-    prefix="/user", # このルーター内の全てのエンドポイントは /user から始まります
+    prefix="/users", # このルーター内の全てのエンドポイントは /user から始まります
     tags=["Users"], # Swagger UIで表示されるタグ
     responses={404: {"description": "Not found"}},
 )
 
 # --- レスポンスモデルの定義 ---
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    gender: str
+    birthday: str
+    phone_number: str
+    address: str
+    user_role: str
+    blood_type: Optional[str] = None
+    medical_conditions: Optional[str] = None
+    longitude: Optional[float] = None
+    latitude: Optional[float] = None
+
 class QRCodeDataResponse(BaseModel):
     """
     QRコードとして埋め込むデータを返すレスポンスモデル。
@@ -37,33 +49,52 @@ class UserProfileUpdate(BaseModel):
 
 # --- エンドポイントの定義 ---
 
-@router.get(
-    "/qr-code", # prefixが /user なので、実際のエンドポイントは /user/qr-code となります
-    response_model=QRCodeDataResponse,
-    summary="ユーザーのQRコードコンテンツを取得",
-    description="認証済みのユーザーに、QRコードとして埋め込むための固有ID文字列を返します。現在はダミーデータを返却します。"
-)
-async def get_user_qr_code():
-    """
-    認証済みユーザーのQRコードコンテンツを生成・返却します。
-    現時点ではダミーのユーザーIDを生成していますが、
-    実際のアプリケーションでは、認証情報（例: JWTトークンから抽出したユーザーID）を使用して、
-    データベースに登録されている永続的なユーザーIDを元にQRコードコンテンツを生成します。
-    """
-    # TODO: 認証ロジックをここに追加し、リクエストから実際のユーザーIDを取得する
-    # 例: current_user_id = await get_current_user_id_from_token(token)
-    # qr_content = f"mamoru_navi_user:{current_user_id}"
+@router.post("/", summary="ユーザーを作成する")
+def create_user(data: UserCreate):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("""
+                    INSERT INTO users (name, email, gender, birthday, phone_number, address, user_role, blood_type, medical_conditions, home_location)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
+                    RETURNING user_id
+                """, (data.name, data.email, data.gender, data.birthday, data.phone_number,
+                      data.address, data.user_role, data.blood_type, data.medical_conditions,
+                      data.longitude, data.latitude))
+                conn.commit()
+                return {"message": "user created", "user_id": str(cur.fetchone()[0])}
+            except Exception:
+                conn.rollback()
+                raise HTTPException(status_code=400, detail="メールアドレスまたは電話番号は既に登録されています!")
 
-    # 【固定テストユーザー対応】
-    # 毎回ランダムなUUID( uuid.uuid4() )を作るのではなく、全員共通の固定UUIDを使用します。
-    # データベースの users テーブルにも、このUUIDを持つユーザーを1件だけ登録しておきます。
+@router.get("/", summary="全ユーザーを取得する")
+def get_users():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, name, email FROM users")
+            users = cur.fetchall()
+            return [{"user_id": str(u[0]), "name": u[1], "email": u[2]} for u in users]
+
+@router.get("/qr-code", response_model=QRCodeDataResponse, summary="ユーザーのQRコードコンテンツを取得")
+def get_user_qr_code():
     dummy_user_identifier = "123e4567-e89b-12d3-a456-426614174000"
     qr_content_string = f"mamoru_navi_user:{dummy_user_identifier}"
-
     return QRCodeDataResponse(
         qr_code_content=qr_content_string,
         message="ユーザーIDに基づいたQRコードコンテンツを生成しました。"
     )
+
+@router.get("/{user_id}", summary="IDでユーザーを取得する")
+def get_user(user_id: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
+            user = cur.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
+            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
+        
+
 
 
 

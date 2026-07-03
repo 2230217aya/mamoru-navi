@@ -11,6 +11,8 @@ import { router } from "expo-router";
 // ===== BottomSheet =====
 import HomeBottomSheet from "../components/home/HomeBottomSheet";
 
+import Constants from "expo-constants";
+
 // ===== Reanimated =====
 import "react-native-reanimated";
 
@@ -48,8 +50,6 @@ import {
   getDistance,
 } from "@/src/utils/mapUtils";
 
-import Constants from "expo-constants";
-
 // ===== ネットワーク状態 =====
 import * as Network from "expo-network";
 
@@ -70,6 +70,15 @@ type OfficeService = {
   id: number;
   title: string;
   number: string;
+};
+
+type Shelter = {
+  shelter_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
 };
 
 // ===== クイック検索用の仮データ =====
@@ -147,6 +156,9 @@ export default function UserHome() {
   // ---------------------------------------------------------
   // 3. 外部参照・固定データ (Refs & Constants)
   // ---------------------------------------------------------
+  const [shelters, setShelters] = useState<Shelter[]>([]);
+
+  // ===== MapView参照 =====
   const mapRef = useRef<MapView | null>(null);
   const [officeServices, setOfficeServices] = useState<OfficeService[]>([]); // 施設情報
   const [facilityLocation] = useState({
@@ -154,7 +166,7 @@ export default function UserHome() {
     longitude: 135.5023,
   });
 
-  // タイル保存先のパス設定
+  // タイル保存先のパス設定（オフライン地図に必須）
   const TILE_DIR = (ExpoFileSystem as any).documentDirectory?.endsWith("/")
     ? (ExpoFileSystem as any).documentDirectory
     : `${(ExpoFileSystem as any).documentDirectory}/`;
@@ -174,9 +186,51 @@ export default function UserHome() {
   // 5. API通信関数 (Data Fetching)
   // ---------------------------------------------------------
 
+  // ★ APIのベースURL取得を1箇所に集約
+  const getBaseUrl = () => {
+    const debuggerHost = Constants.expoConfig?.hostUri;
+    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+    return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+  };
+
+  /**
+   * 避難所リストの取得
+   */
+  const fetchShelters = async () => {
+    try {
+      const baseUrl = getBaseUrl();
+      const url = `${baseUrl}/shelters/`;
+
+      console.log("オンライン避難所API通信先:", url);
+
+      const response = await fetch(`${baseUrl}/shelters/`, {
+        method: "GET",
+        headers: API_HEADERS,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log("オンライン避難所APIエラー:", response.status);
+        console.log("エラー詳細:", errorText);
+        return;
+      }
+
+      const data = await response.json();
+
+      console.log("オンライン避難所データ取得成功:", data);
+      console.log("オンライン避難所件数:", data.length);
+
+      setShelters(data);
+    } catch (error) {
+      console.log("オンライン避難所データ取得エラー:", error);
+    }
+  };
+
   /**
    * 平常時：避難所混雑状況の取得
    */
+
+  // ===== API取得 =====
   const fetchOfficeServices = async () => {
     try {
       setLoading(true);
@@ -222,6 +276,7 @@ export default function UserHome() {
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     try {
+      // --- A. オンライン試行 ---
       const response = await fetch(
         `${getBaseUrl()}/map/my-plan/${testUserId}`,
         {
@@ -441,6 +496,7 @@ export default function UserHome() {
           showsMyLocationButton={true} // ★ 右下に「現在地へ戻る」ボタンを出す
           mapPadding={{ top: 50, right: 10, bottom: 10, left: 10 }} // UIに重ならないよう調整
         >
+          {/* 1. オフライン地図レイヤー */}
           {mode === MODES.DISASTER && !isOnline && (
             <UrlTile
               key="offline-tile"
@@ -502,14 +558,29 @@ export default function UserHome() {
                 </View>
               </Marker>
 
-              {/* ④ [点] 避難所マーカー（色の更新を強制） */}
+              {/* ④ [点] 周辺の避難所リスト */}
+              {/* ===== 避難所マーカー ===== */}
+              {shelters.map((shelter) => (
+                <Marker
+                  key={shelter.shelter_id}
+                  coordinate={{
+                    latitude: shelter.latitude,
+                    longitude: shelter.longitude,
+                  }}
+                  pinColor="red"
+                  title={shelter.name}
+                  description={`${shelter.address} / 収容人数: ${shelter.capacity}人`}
+                />
+              ))}
+
+              {/* ⑤ [点] ★ナビの目的地：最優先で表示 */}
               {destination && (
                 <Marker
                   key={`shelter-marker-${isOnline ? "online" : "offline"}`}
                   coordinate={destination}
                   pinColor={isOnline ? "red" : "orange"}
                   title="指定避難所"
-                  zIndex={10}
+                  zIndex={15}
                 />
               )}
             </>
