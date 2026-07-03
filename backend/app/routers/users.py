@@ -1,10 +1,11 @@
 # backend/app/routers/users.py
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import uuid
-from database import get_db
+from database import get_db, get_db_connection
+from psycopg2.extras import RealDictCursor
 
 # APIRouterのインスタンスを作成
 # これが「ユーザー関連」のエンドポイントをまとめるルーターになります。
@@ -35,7 +36,6 @@ class QRCodeDataResponse(BaseModel):
     """
     qr_code_content: str
     message: str = "QRコードのコンテンツを生成しました。"
-
 
 # プロフィール更新で受け取るデータの型定義
 class UserProfileUpdate(BaseModel):
@@ -88,12 +88,11 @@ def get_user_qr_code():
 def get_user(user_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
+            cur.execute("SELECT user_id, name, gender, birthday, age, blood_type, medical_conditions, phone_number, address FROM users WHERE user_id = %s", (user_id,))
             user = cur.fetchone()
             if not user:
                 raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
-            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
-        
+            return {"user_id": str(user[0]), "name": user[1], "gender": user[2], "birthday": user[3], "age": user[4], "blood_type": user[5], "medical_conditions": user[6], "phone_number": user[7], "address": user[8]}
 
 
 
@@ -166,7 +165,6 @@ def update_user_profile(profile: UserProfileUpdate):
         cur.close()
         conn.close()
 
-
 # backend/app/routers/users.py
 
 @router.get("/my-role", summary="現在のユーザーのロールを取得")
@@ -185,4 +183,3 @@ def get_user_role():
     finally:
         cur.close()
         conn.close()        
-

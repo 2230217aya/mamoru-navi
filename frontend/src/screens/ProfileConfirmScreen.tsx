@@ -32,7 +32,7 @@ export default function ProfileConfirmScreen() {
           const baseUrl =
             process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
 
-          const response = await fetch(`${baseUrl}/user/profile`);
+          const response = await fetch(`${baseUrl}/users/profile`);
           const data = await response.json();
 
           if (isActive && data.status === "success") {

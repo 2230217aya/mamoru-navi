@@ -1,6 +1,5 @@
 -- 平常時の公共施設データ
-
-CREATE TABLE facilities (
+CREATE TABLE IF NOT EXISTS facilities (
     facility_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
     type_id UUID NOT NULL,

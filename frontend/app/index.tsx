@@ -14,7 +14,14 @@ export default function Index() {
         const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
         const baseUrl =
           process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-        const response = await fetch(`${baseUrl}/user/my-role`);
+        console.log("ロール取得API通信先:", `${baseUrl}/users/my-role`);
+        const response = await fetch(`${baseUrl}/users/my-role`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "bypass-tunnel-reminder": "true",
+          },
+        });
         const data = await response.json();
         setRole(data.user_role);
       } catch (e) {
