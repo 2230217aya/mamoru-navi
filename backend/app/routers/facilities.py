@@ -84,7 +84,7 @@ def get_office_services(facility_id: str):
                       WHERE fr.status = 'in_progress' AND DATE(fr.created_at) = CURRENT_DATE
                     ), 0
                   ) AS number
-                FROM facility_purpose fp
+                FROM facility_purposes fp
                 JOIN facilities f ON f.type_id = fp.type_id
                 LEFT JOIN facility_reservations fr
                   ON fr.purpose_id = fp.purpose_id AND fr.facility_id = f.facility_id
