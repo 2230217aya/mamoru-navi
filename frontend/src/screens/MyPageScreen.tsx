@@ -13,6 +13,7 @@ import { SafeAreaFrameContext } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
 const QR_CACHE_KEY = "cached_qr_code_content";
 
@@ -33,42 +34,25 @@ export default function MyPageScreen({ navigator }: any) {
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
       try {
-        const debuggerHost = Constants.expoConfig?.hostUri;
-        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
         // .envがあればそれを使うように戻しました
-        const baseUrl =
-          process.env.EXPO_PUBLIC_API_URL ||
-          // 1. まず localIp が localhost ならそのまま localhost を使う
-          // 2. もしあなたが adb reverse を実行済みなら、スマホ内の localhost:8000 が PC に直結している
-          // 3. 他の人がモバイルスポット(192.x.x.x)を使っているなら、localIp は自動的にそのIPになる
-          (localIp === "localhost" || localIp === "127.0.0.1"
-            ? `http://localhost:8000`
-            : `http://${localIp}:8000`);
-        const apiUrl = `${baseUrl}/user/qr-code`;
+        const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
+        const apiUrl = `${baseUrl}/users/qr-code`;
 
         const response = await fetch(apiUrl, {
           method: "GET",
-          headers: {
-            "Bypass-Tunnel-Reminder": "true",
-            "Content-Type": "application/json",
-          },
+          headers: API_HEADERS,
           signal: controller.signal, // ★ 2. fetchにタイムアウトの合図を渡す
         });
 
         clearTimeout(timeoutId); // 通信成功したらタイマーを止める
 
-        console.log("Response Status:", response.status);
-
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Error response:", errorText);
           throw new Error(`エラー: ${response.status}`);
         }
-
         const data = await response.json();
         setQrData(data.qr_code_content);
 
-        // ★ 取得したQRデータをスマホに保存（キャッシュ）する
+        // 保存（非同期なので完了を待つ）
         await AsyncStorage.setItem(QR_CACHE_KEY, data.qr_code_content);
         setError(null);
       } catch (err) {
@@ -76,9 +60,9 @@ export default function MyPageScreen({ navigator }: any) {
         console.error("QRコード取得エラー（オフライン移行）:", err);
 
         // ★ 3. 通信エラー時はキャッシュを探す
+        // オフライン・エラー時のフォールバック
         try {
           const cachedQr = await AsyncStorage.getItem(QR_CACHE_KEY);
-
           if (cachedQr) {
             setQrData(cachedQr);
             setError("※オフラインのため、保存されたQRを表示しています");

@@ -16,10 +16,10 @@ export default function Index() {
         // --- 1. 共通ユーティリティからベースURLを取得 ---
         const baseUrl = getBaseUrl();
 
-        console.log(`📡 [Index] ロール取得API通信先: ${baseUrl}/user/my-role`);
+        console.log(`📡 [Index] ロール取得API通信先: ${baseUrl}/users/my-role`);
 
         // --- 2. 共通ヘッダーを使ってリクエスト送信 ---
-        const response = await fetch(`${baseUrl}/user/my-role`, {
+        const response = await fetch(`${baseUrl}/users/my-role`, {
           method: "GET",
           headers: API_HEADERS, // bypass-tunnel-reminder もここに含まれています
         });

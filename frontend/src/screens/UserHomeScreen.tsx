@@ -186,13 +186,6 @@ export default function UserHome() {
   // 5. API通信関数 (Data Fetching)
   // ---------------------------------------------------------
 
-  // ★ APIのベースURL取得を1箇所に集約
-  const getBaseUrl = () => {
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-    return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-  };
-
   /**
    * 避難所リストの取得
    */
@@ -445,7 +438,7 @@ export default function UserHome() {
         {
           // 避難用なので高精度モード
           accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 5000, // 5000ミリ秒ごとに更新
+          timeInterval: 10000, // 10000ミリ秒ごとに更新
           distanceInterval: 3, // 3メートル移動するごとに更新
         },
         (location: Location.LocationObject) => {

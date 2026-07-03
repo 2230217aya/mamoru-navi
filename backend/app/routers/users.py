@@ -2,9 +2,12 @@
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import uuid
-from database import get_db
+import json
+from database import get_db,get_db_connection
+import psycopg2
+from psycopg2.extras import RealDictCursor 
 
 # APIRouterのインスタンスを作成
 # これが「ユーザー関連」のエンドポイントをまとめるルーターになります。
@@ -77,12 +80,32 @@ def get_users():
 
 @router.get("/qr-code", response_model=QRCodeDataResponse, summary="ユーザーのQRコードコンテンツを取得")
 def get_user_qr_code():
-    dummy_user_identifier = "123e4567-e89b-12d3-a456-426614174000"
+    dummy_user_identifier = "11111111-1111-1111-1111-111111111111"
     qr_content_string = f"mamoru_navi_user:{dummy_user_identifier}"
     return QRCodeDataResponse(
         qr_code_content=qr_content_string,
         message="ユーザーIDに基づいたQRコードコンテンツを生成しました。"
     )
+
+
+@router.get("/my-role", summary="現在のユーザーのロールを取得")
+def get_user_role():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # TEST_USER_ID は 123e4567... を使用
+        cur.execute("SELECT user_role FROM users WHERE user_id = %s;", (TEST_USER_ID,))
+        result = cur.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+            
+        return {"status": "success", "user_role": result["user_role"]}
+    finally:
+        cur.close()
+        conn.close()        
+
+
 
 @router.get("/{user_id}", summary="IDでユーザーを取得する")
 def get_user(user_id: str):
@@ -99,7 +122,7 @@ def get_user(user_id: str):
 
 
 # 本来は認証トークンから取得しますが、今はテストユーザーの固定UUIDを使用します
-TEST_USER_ID = "123e4567-e89b-12d3-a456-426614174000"
+TEST_USER_ID = "11111111-1111-1111-1111-111111111111"
 
 @router.get("/profile", summary="ユーザーのプロフィールを取得")
 def get_user_profile():
@@ -165,24 +188,3 @@ def update_user_profile(profile: UserProfileUpdate):
     finally:
         cur.close()
         conn.close()
-
-
-# backend/app/routers/users.py
-
-@router.get("/my-role", summary="現在のユーザーのロールを取得")
-def get_user_role():
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        # TEST_USER_ID は 123e4567... を使用
-        cur.execute("SELECT user_role FROM users WHERE user_id = %s;", (TEST_USER_ID,))
-        result = cur.fetchone()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
-            
-        return {"status": "success", "user_role": result["user_role"]}
-    finally:
-        cur.close()
-        conn.close()        
-

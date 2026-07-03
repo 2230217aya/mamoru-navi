@@ -21,7 +21,7 @@ export default function ScanQRScreen() {
   const [scanned, setScanned] = useState(false);
 
   const STAFF_CONFIG = {
-    location_id: "123e4567-e89b-12d3-a456-426614174000",
+    location_id: "11111111-1111-1111-1111-111111111111", // ★テスト用の避難所IDに変更
     scan_mode: "shelter",
   };
 

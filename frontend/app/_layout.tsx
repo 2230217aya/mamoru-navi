@@ -147,7 +147,7 @@ export default function RootLayout() {
     // 2. ロール取得
     const fetchUserRole = async () => {
       try {
-        const response = await fetch(`${baseUrl}/user/my-role`, {
+        const response = await fetch(`${baseUrl}/users/my-role`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

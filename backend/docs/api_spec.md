@@ -296,7 +296,7 @@ GET /user/qr-code
 
 ```json
 {
-  "qr_code_content": "mamoru_navi_user:123e4567-e89b-12d3-a456-426614174000",
+  "qr_code_content": "mamoru_navi_user:11111111-1111-1111-1111-111111111111",
   "message": "ユーザーIDに基づいたQRコードコンテンツを生成しました。"
 }
 ```
@@ -383,7 +383,7 @@ POST /scan/qr-code
 
 ```json
 {
-  "qr_data": "mamoru_navi_user:123e4567-e89b-12d3-a456-426614174000",
+  "qr_data": "mamoru_navi_user:11111111-1111-1111-1111-111111111111",
   "scan_mode": "shelter",
   "location_id": "123e4567-e89b-12d3-a456-426614174001"
 }
@@ -396,7 +396,7 @@ POST /scan/qr-code
   "status": "success",
   "message": "スキャン処理が正常に完了しました",
   "user_info": {
-    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "11111111-1111-1111-1111-111111111111",
     "name": "テストユーザー太郎",
     "blood_type": "A",
     "medical_conditions": "特になし"

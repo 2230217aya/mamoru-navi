@@ -430,13 +430,6 @@ export default function SafetyScreen() {
   );
 }
 
-const getBaseUrl = () => {
-  const debuggerHost = Constants.expoConfig?.hostUri;
-  const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-
-  return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

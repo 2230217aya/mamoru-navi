@@ -26,22 +26,19 @@ from routers import (
 class LocationRequest(BaseModel):
     user_id: str
     latitude: float
-    longitude: float  
+    longitude: float
+
+class ShelterCreate(BaseModel):
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    capacity: Optional[int] = None
 
 
-app = FastAPI()
-
-app.include_router(users.router)
-app.include_router(scan.router)
-app.include_router(checkins.router)
-app.include_router(notifications.router)
-app.include_router(reservations.router)
-app.include_router(danger_area.router)
-app.include_router(congestion.router)
-app.include_router(facilities.router)
 
 # ===== HELPERS =====
- 
+ # --- 2. ユーティリティ ---
 def convert_crowd_level(current_user_count: int, capacity: int):
     if capacity is None or capacity <= 0:
         return None, "unknown"
@@ -56,23 +53,9 @@ def convert_crowd_level(current_user_count: int, capacity: int):
         crowd_level = "満員"
     return round(crowd_rate, 2), crowd_level
  
- 
-# ===== SCHEMA =====
- 
-class LocationRequest(BaseModel):
-    user_id: str
-    latitude: float
-    longitude: float
- 
-class ShelterCreate(BaseModel):
-    name: str
-    address: str
-    latitude: float
-    longitude: float
-    capacity: Optional[int] = None
 
 # ==========================================
-# 2. Lifespan (起動・終了時処理) の定義
+# 3. Lifespan (起動・終了時処理) の定義
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -112,29 +95,34 @@ async def lifespan(app: FastAPI):
     print("🛑 アプリケーション終了")
 
 # ==========================================
-# 3. FastAPIインスタンスの生成 (唯一のapp)
+# 4. FastAPIインスタンスの生成 (唯一のapp)
 # ==========================================
 app = FastAPI(lifespan=lifespan)
 
 # ==========================================
-# 4. ミドルウェア設定 (唯一のappに対して)
+# 5. ミドルウェア設定 (唯一のappに対して)
 # ==========================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # 開発時は "*"、本番は特定のURL
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"], # 全メソッド許可
     allow_headers=["*"],
 )
 
-# ==========================================
-# 5. ルーターの登録 (唯一のappに対して)
-# ==========================================
+
+# --- 6. ルーターの登録 (インスタンス生成後に行う) ---
 app.include_router(users.router)
 app.include_router(scan.router)
+app.include_router(checkins.router)
+app.include_router(notifications.router)
+app.include_router(reservations.router)
+app.include_router(danger_area.router)
+app.include_router(congestion.router)
+app.include_router(facilities.router)
 
 # ==========================================
-# 6. エンドポイント定義
+# 7. エンドポイント定義
 # ==========================================
 
 
@@ -547,22 +535,24 @@ def get_my_evacuation_plan(user_id: str):
     try:
         conn = get_db_connection()
         import psycopg2.extras
+        import json
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # ユーザー位置取得
+        # 1. ユーザー位置取得
         cur.execute("SELECT ST_X(location::geometry) as lon, ST_Y(location::geometry) as lat FROM user_locations WHERE user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
         u_loc = cur.fetchone()
-        if not u_loc:
-             raise HTTPException(status_code=500, detail=f"Internal Error: user_locations にデータがありません。")
+        
+        # 位置がない場合のフォールバック（エラーで止めない）
+        u_lon = u_loc['lon'] if u_loc else 135.4950
+        u_lat = u_loc['lat'] if u_loc else 34.7024
 
-        # ノード検索・pgRouting実行（HEADのロジック）
+        # 2. ノード検索と最寄り避難所 (KNN検索)
         cur.execute("""
             WITH target_shelter AS (
                 SELECT shelter_id, name, latitude, longitude,
                        ST_SetSRID(ST_Point(longitude, latitude), 4326) as shelter_geom
                 FROM shelters
-                ORDER BY ST_SetSRID(ST_Point(longitude, latitude), 4326)::geography <-> 
-                         ST_SetSRID(ST_Point(%s, %s), 4326)::geography
+                ORDER BY ST_SetSRID(ST_Point(longitude, latitude), 4326) <-> ST_SetSRID(ST_Point(%s, %s), 4326)
                 LIMIT 1
             )
             SELECT 
@@ -570,27 +560,40 @@ def get_my_evacuation_plan(user_id: str):
                 (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT shelter_geom FROM target_shelter) LIMIT 1) as end_node,
                 s.*
             FROM target_shelter s;
-        """, (u_loc['lon'], u_loc['lat'], u_loc['lon'], u_loc['lat']))
+        """, (u_lon, u_lat, u_lon, u_lat))
         points = cur.fetchone()
 
+        if not points or not points['start_node'] or not points['end_node']:
+             raise HTTPException(status_code=404, detail="経路計算の基点が見つかりません。道路データを確認してください。")
+
+        # 3. pgr_dijkstra 実行 
+        # ★ 修正ポイント: cost_s が存在しない場合が多いため 'length' または 'cost' に修正
         cur.execute("""
             SELECT ST_AsGeoJSON(ST_Transform(ST_MakeLine(res.the_geom), 4326)) as geojson
             FROM (
                 SELECT w.the_geom
                 FROM pgr_dijkstra(
-                    'SELECT gid as id, source, target, cost_s AS cost FROM ways WHERE cost_s > 0',
+                    'SELECT gid as id, source, target, length as cost FROM ways WHERE source IS NOT NULL AND target IS NOT NULL',
                     %s, %s, directed := false
                 ) AS di
                 JOIN ways AS w ON di.edge = w.gid
                 ORDER BY di.seq
             ) AS res;
         """, (points['start_node'], points['end_node']))
+        
         route_result = cur.fetchone()
 
-        import json
-        route_data = json.loads(route_result['geojson']) if route_result and route_result['geojson'] else {
-            "type": "LineString", "coordinates": [[u_loc['lon'], u_loc['lat']], [points['longitude'], points['latitude']]]
-        }
+        # ★ 修正ポイント: route_result['geojson'] ではなく route_result.get('geojson') で安全に取得
+        geojson_str = route_result['geojson'] if (route_result and route_result.get('geojson')) else None
+
+        if geojson_str:
+            route_data = json.loads(geojson_str)
+        else:
+            # 経路が見つからなかった時の直線フォールバック
+            route_data = {
+                "type": "LineString", 
+                "coordinates": [[u_lon, u_lat], [float(points['longitude']), float(points['latitude'])]]
+            }
 
         return {
             "status": "success",
@@ -606,7 +609,9 @@ def get_my_evacuation_plan(user_id: str):
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # 詳細をログに出して、クライアントにはエラーメッセージを返す
+        print(f"❌ Route Engine Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"経路計算失敗: {str(e)}")
     finally:
         if conn: conn.close()
 
