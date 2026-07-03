@@ -3,7 +3,7 @@
 import { Ionicons } from "@expo/vector-icons";
 
 // ===== 地図 =====
-import MapView, { Marker, Polyline, UrlTile } from "react-native-maps";
+import MapView, { Marker, Polyline, UrlTile, Callout } from "react-native-maps";
 
 // ===== 画面遷移 =====
 import { router } from "expo-router";
@@ -157,6 +157,8 @@ export default function UserHome() {
   // 3. 外部参照・固定データ (Refs & Constants)
   // ---------------------------------------------------------
   const [shelters, setShelters] = useState<Shelter[]>([]);
+
+  const [selectedShelter, setSelectedShelter] = useState<Shelter | null>(null);
 
   // ===== MapView参照 =====
   const mapRef = useRef<MapView | null>(null);
@@ -563,7 +565,28 @@ export default function UserHome() {
                   pinColor="red"
                   title={shelter.name}
                   description={`${shelter.address} / 収容人数: ${shelter.capacity}人`}
-                />
+                  onPress={() => {
+                    setSelectedShelter(shelter);
+                    console.log("選択された避難所 onPress:", shelter);
+                  }}
+                  onSelect={() => {
+                    setSelectedShelter(shelter);
+                    console.log("選択された避難所 onSelect:", shelter);
+                  }}
+                >
+                  <Callout
+                    onPress={() => {
+                      setSelectedShelter(shelter);
+                      console.log("選択された避難所 Callout:", shelter);
+                    }}
+                  >
+                    <View>
+                      <Text>{shelter.name}</Text>
+                      <Text>{shelter.address}</Text>
+                      <Text>収容人数: {shelter.capacity}人</Text>
+                    </View>
+                  </Callout>
+                </Marker>
               ))}
 
               {/* ⑤ [点] ★ナビの目的地：最優先で表示 */}
