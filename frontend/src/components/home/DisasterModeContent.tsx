@@ -1,17 +1,28 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-type Props = {
-  expanded: boolean;
+type Shelter = {
+  shelter_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
 };
 
-export default function DisasterModeContent({ expanded }: Props) {
+type Props = {
+  expanded: boolean;
+  selectedShelter: Shelter | null;
+};
+
+
+export default function DisasterModeContent({ expanded, selectedShelter }: Props) {
   // 展開されていない場合は何も表示しない
   if (!expanded) return null;
 
   // 避難所情報（ダミーデータ）
   const shelterData = {
-    capacity: 50,
+    capacity: selectedShelter?.capacity ?? 50,
 
     toilet: {
       maleSmall: 3,
@@ -45,6 +56,19 @@ export default function DisasterModeContent({ expanded }: Props) {
 
   return (
     <View style={styles.container}>
+
+      {/* 避難所名表示 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          {selectedShelter?.name ?? '避難所未選択'}
+        </Text>
+
+        {selectedShelter && (
+          <Text style={styles.value}>
+            {selectedShelter.address}
+          </Text>
+        )}
+      </View>
 
       {/* 最大収容人数表示 */}
       <View style={styles.row}>

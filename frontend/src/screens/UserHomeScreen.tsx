@@ -538,6 +538,7 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
+            selectedShelter={selectedShelter}
           />
         )}
 
