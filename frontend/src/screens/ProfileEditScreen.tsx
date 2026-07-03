@@ -50,7 +50,7 @@ export default function ProfileEditScreen() {
         const baseUrl =
           process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
 
-        const response = await fetch(`${baseUrl}/user/profile`);
+        const response = await fetch(`${baseUrl}/users/profile`);
         const data = await response.json();
 
         if (data.status === "success") {
@@ -99,7 +99,7 @@ export default function ProfileEditScreen() {
       const baseUrl =
         process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
 
-      const response = await fetch(`${baseUrl}/user/profile`, {
+      const response = await fetch(`${baseUrl}/users/profile`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

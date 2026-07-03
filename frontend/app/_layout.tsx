@@ -40,7 +40,7 @@ export default function RootLayout() {
         const baseUrl =
           process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
 
-        const response = await fetch(`${baseUrl}/user/my-role`, {
+        const response = await fetch(`${baseUrl}/users/my-role`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
