@@ -2,7 +2,7 @@
 import { Ionicons } from '@expo/vector-icons';
 
 // ===== 地図 =====
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 
 // ===== 画面遷移 =====
 import { router } from 'expo-router';
@@ -121,6 +121,8 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
     useState<OfficeService[]>([]);
 
   const [shelters, setShelters] = useState<Shelter[]>([]);
+ 
+  const [selectedShelter, setSelectedShelter] = useState<Shelter | null>(null);
 
   // ===== MapView参照 =====
   const mapRef = useRef<MapView | null>(null);
@@ -150,42 +152,14 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
     longitude: 135.504684,
   };
 
-  // ===== 仮ルートデータ =====
-  const routeCoordinates = [
+  // ===== 避難ルート座標 =====
+  const routeCoordinates = selectedShelter ? [
+    origin,
     {
-      latitude: 34.706443,
-      longitude: 135.503214,
+      latitude: selectedShelter.latitude,
+      longitude: selectedShelter.longitude, 
     },
-    {
-      latitude: 34.706443,
-      longitude: 135.503432,
-    },
-
-    {
-      latitude: 34.707161,
-      longitude: 135.503310,
-    },
-
-    {
-      latitude: 34.707216,
-      longitude: 135.503969,
-    },
-
-    {
-      latitude: 34.707052,
-      longitude: 135.504033,
-    },
-
-    {
-      latitude: 34.707237,
-      longitude: 135.504852,
-    },
-
-    {
-      latitude: 34.707500,
-      longitude: 135.504684,
-    },
-  ];
+  ] : [origin, destination];
 
   const getBaseUrl = () => {
       const debuggerHost = Constants.expoConfig?.hostUri;
@@ -333,7 +307,28 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
                   pinColor="red"
                   title={shelter.name}
                   description={`${shelter.address} / 収容人数: ${shelter.capacity}人`}
-                />
+                  onPress={() => {
+                    setSelectedShelter(shelter);
+                    console.log("選択された避難所 onPress:", shelter);
+                  }}
+                  onSelect={() => {
+                    setSelectedShelter(shelter);
+                    console.log("選択された避難所 onSelect:", shelter);
+                  }}
+                >
+                  <Callout
+                    onPress={() => {
+                      setSelectedShelter(shelter);
+                      console.log("選択された避難所 Callout:", shelter);
+                    }}
+                  >
+                    <View>
+                      <Text>{shelter.name}</Text>
+                      <Text>{shelter.address}</Text>
+                      <Text>収容人数: {shelter.capacity}人</Text>
+                    </View>
+                  </Callout>
+                </Marker>
               ))}
 
                 {/* ===== 避難ルート ===== */}
