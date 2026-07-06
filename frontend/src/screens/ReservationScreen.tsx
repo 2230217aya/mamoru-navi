@@ -1,207 +1,212 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ReservationCompleteScreen from '../screens/Reservationcompletescreen';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
 type OfficeService = {
-  id: number;
+  id: string;
   title: string;
   number: string;
 };
-  const mockServices: OfficeService[] = [
-  {
-    id: 1,
-    title: '証明書の発行',
-    number: '22',
-  },
-  {
-    id: 2,
-    title: '住所の変更・印鑑登録',
-    number: '57',
-  },
-  {
-    id: 3,
-    title: 'マイナンバー',
-    number: '132',
-  },
-  {
-    id: 4,
-    title: '戸籍の提出・相談',
-    number: '12',
-  },
-];
-const serviceOptions = [
-  '証明書の発行',
-  '住所の変更・印鑑登録',
-  'マイナンバー',
-  '戸籍の提出・相談',
-];
-
 
 export default function ReservationScreen() {
-const [isComplete, setIsComplete] = useState(false);
-const [receiptNumber] = useState(169); // 實際應從 API 取得
-const [selectedService, setSelectedService] =
-  useState<string | null>(null);
-    if (isComplete) {
+  const { facilityId } = useLocalSearchParams<{ facilityId: string }>();
+  console.log('facilityId:', facilityId);
+
+  const [services, setServices] = useState<OfficeService[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [servicesError, setServicesError] = useState<string | null>(null);
+
+  const [isComplete, setIsComplete] = useState(false);
+  const [receiptNumber, setReceiptNumber] = useState<number | null>(null);
+  const [waitMinutes, setWaitMinutes] = useState<number>(0);
+  const [selectedService, setSelectedService] = useState<OfficeService | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // ===== 窓口サービス一覧を取得 ===== NGNGNGNGNGNG
+  useEffect(() => {
+    (async () => {
+      try {
+        await AsyncStorage.setItem('user_id', '123e4567-e89b-12d3-a456-426614174000');
+        const check = await AsyncStorage.getItem('user_id');
+        console.log('DEBUG: user_id の保存に成功しました:', check);
+      } catch (err) {
+        console.error('DEBUG: user_id の保存に失敗しました:', err);
+      }
+    })();
+
+    if (!facilityId) return;
+
+    setLoadingServices(true);
+    setServicesError(null);
+
+    fetch(`${API_BASE_URL}/facilities/${facilityId}/office-services`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data: OfficeService[]) => setServices(data))
+      .catch((err) => {
+        console.error(err);
+        setServicesError('窓口情報の取得に失敗しました');
+      })
+      .finally(() => setLoadingServices(false));
+  }, [facilityId]);
+
+  // ===== 予約作成 =====
+  const handleReserve = async () => {
+    if (!selectedService || !facilityId || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const userId = await AsyncStorage.getItem('user_id');
+      if (!userId) {
+        console.error('user_id not found, user might not be logged in');
+        setSubmitting(false);
+        return;
+      }
+
+      const now = new Date();
+      const end = new Date(now.getTime() + 30 * 60 * 1000); // とりあえず30分後
+
+      const res = await fetch(`${API_BASE_URL}/reservations/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: facilityId,
+          user_id: userId,
+          purpose_id: selectedService.id,
+          start_time: now.toISOString(),
+          end_time: end.toISOString(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail ?? `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setReceiptNumber(data.issued_number);
+      setWaitMinutes(data.estimated_wait_minutes);
+      setIsComplete(true);
+    } catch (err) {
+      console.error(err);
+      // TODO: tampilin toast/alert error ke user
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (isComplete && receiptNumber !== null) {
     return (
       <ReservationCompleteScreen
-        receiptNumber={receiptNumber}
-        waitMinutes={50}
-        serviceName={selectedService ?? undefined}
+        issuedNumber={receiptNumber}
+        estimatedWaitMinutes={waitMinutes}
+        serviceName={selectedService?.title}
         onShowQR={() => router.push('../my-page')}
         onGoHome={() => router.push('../')}
       />
     );
   }
+
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={
-        styles.contentContainer
-      }
+      contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* Title */}
-      <Text style={styles.title}>
-        受付・予約
-      </Text>
+      <Text style={styles.title}>受付・予約</Text>
 
       <View style={styles.card}>
-
-        {/* Name */}
         <View style={styles.nameBox}>
-        <Text style={styles.icon}>
-          🏠
-        </Text>
+          <Text style={styles.icon}>🏠</Text>
+          <Text style={styles.nameLabel}>大阪市役所</Text>
+        </View>
 
-        <Text style={styles.nameLabel}>大阪市役所</Text>
-      </View>
-
-        {/* Address */}
         <View style={styles.addressBox}>
-          
-          {/* PostCode */}
           <View style={styles.addressTop}>
-            <Text style={styles.addressLabel}>
-              現在の待ち状況
-            </Text>
-
-          
-            
+            <Text style={styles.addressLabel}>現在の待ち状況</Text>
           </View>
 
           <View style={styles.infoRow}>
-
-        <Text style={styles.cardText}>
-          営業時間: 9:00~17:00
-        </Text>
-
-        <Text style={styles.closedText}>
-          定休日: 土日祝
-        </Text>
-
-      </View>
-
-      <View style={styles.updateRow}>
-
-        <Text style={styles.updateText}>
-          最終更新: 10:35
-        </Text>
-
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={() => {
-            console.log('refresh');
-          }}
-        >
-          <Ionicons
-            name="refresh"
-            size={20}
-            color="#373737"
-          />
-        </TouchableOpacity>
-
-      </View>
-
-      <View style={styles.serviceBox}>
-
-        {mockServices.map((item) => (
-
-          <View
-            key={item.id}
-            style={styles.rowItem}
-          >
-
-            <Text style={styles.serviceTitle}>
-              {item.title}
-            </Text>
-
-            <Text style={styles.numberText}>
-              {item.number}番
-            </Text>
-
+            <Text style={styles.cardText}>営業時間: 9:00~17:00</Text>
+            <Text style={styles.closedText}>定休日: 土日祝</Text>
           </View>
 
-        ))}
+          <View style={styles.updateRow}>
+            <Text style={styles.updateText}>最終更新: 10:35</Text>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={() => console.log('refresh')}
+            >
+              <Ionicons name="refresh" size={20} color="#373737" />
+            </TouchableOpacity>
+          </View>
 
-      </View>
-    
-
-      </View>
-        <Text style={styles.choiceTitle}>
-          選択
-        </Text>
-
-        {serviceOptions.map(service => (
-        <TouchableOpacity
-          key={service}
-          style={[
-            styles.radiusButton,
-            selectedService === service &&
-              styles.radiusButtonActive,
-          ]}
-          onPress={() =>
-            setSelectedService(service)
-          }
-        >
-          <View style={styles.radioOuter}>
-            {selectedService === service && (
-              <View
-                style={styles.radioInner}
-              />
+          <View style={styles.serviceBox}>
+            {loadingServices ? (
+              <ActivityIndicator size="small" color="#373737" />
+            ) : servicesError ? (
+              <Text style={styles.emptyText}>{servicesError}</Text>
+            ) : services.length === 0 ? (
+              <Text style={styles.emptyText}>窓口情報がありません</Text>
+            ) : (
+              services.map((item) => (
+                <View key={item.id} style={styles.rowItem}>
+                  <Text style={styles.serviceTitle}>{item.title}</Text>
+                  <Text style={styles.numberText}>{item.number}番</Text>
+                </View>
+              ))
             )}
           </View>
-
-          <Text style={styles.radiusText}>
-            {service}
-          </Text>
-
-        </TouchableOpacity>
-      ))}
-        {/* Button */}
-        <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => selectedService && setIsComplete(true)}  // ← これを追加
-      >
-        <Text style={styles.addButtonText}>予約</Text>
-      </TouchableOpacity>
-
         </View>
 
-        
+        <Text style={styles.choiceTitle}>選択</Text>
 
-   
+        {services.map((service) => (
+          <TouchableOpacity
+            key={service.id}
+            style={[
+              styles.radiusButton,
+              selectedService?.id === service.id && styles.radiusButtonActive,
+            ]}
+            onPress={() => setSelectedService(service)}
+          >
+            <View style={styles.radioOuter}>
+              {selectedService?.id === service.id && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radiusText}>{service.title}</Text>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity
+          style={[styles.addButton, (!selectedService || submitting) && { opacity: 0.5 }]}
+          onPress={handleReserve}
+          disabled={!selectedService || submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color="#111" />
+          ) : (
+            <Text style={styles.addButtonText}>予約</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </ScrollView>
-  );  
-
+  );
 }
 
 const styles = StyleSheet.create({

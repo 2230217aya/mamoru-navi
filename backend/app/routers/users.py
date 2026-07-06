@@ -12,10 +12,14 @@ from psycopg2.extras import RealDictCursor
 # APIRouterのインスタンスを作成
 # これが「ユーザー関連」のエンドポイントをまとめるルーターになります。
 router = APIRouter(
-    prefix="/users", # このルーター内の全てのエンドポイントは /user から始まります
-    tags=["Users"], # Swagger UIで表示されるタグ
+    prefix="/users",  # このルーター内の全てのエンドポイントは /users から始まります
+    tags=["Users"],  # Swagger UIで表示されるタグ
     responses={404: {"description": "Not found"}},
 )
+
+# 本来は認証トークンから取得しますが、今はテストユーザーの固定UUIDを使用します
+# ※ backend/sql のシードデータと同じUUIDにすること
+TEST_USER_ID = "123e4567-e89b-12d3-a456-426614174000"
 
 # --- レスポンスモデルの定義 ---
 class UserCreate(BaseModel):
@@ -47,9 +51,12 @@ class UserProfileUpdate(BaseModel):
     blood_type: Optional[str] = None
     medical_conditions: Optional[str] = None
     phone_number: Optional[str] = None
-    address: Optional[str] = None    
+    address: Optional[str] = None
 
 # --- エンドポイントの定義 ---
+# ★ 重要: 固定パス（/profile, /my-role, /qr-code など）は
+#    必ず動的パス（/{user_id}）より上に定義すること。
+#    順番を間違えると /{user_id} が先にマッチしてしまう。
 
 @router.post("/", summary="ユーザーを作成する")
 def create_user(data: UserCreate):
@@ -116,15 +123,19 @@ def get_user_profile():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT name, gender, birthday, blood_type, medical_conditions, phone_number, address  -- ★birthdayを追加
+            SELECT user_id, name, gender, birthday, blood_type, medical_conditions, phone_number, address
             FROM users WHERE user_id = %s;
         """, (TEST_USER_ID,))
         user = cur.fetchone()
-        
+
         if not user:
             raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
-            
-        return {"status": "success", "profile": dict(user)}
+
+        profile = dict(user)
+        profile["user_id"] = str(profile["user_id"])
+        return {"status": "success", "profile": profile}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -138,32 +149,32 @@ def update_user_profile(profile: UserProfileUpdate):
     try:
         # Pydanticモデルから、値が入っている（送信された）項目だけを辞書で取得
         update_data = profile.model_dump(exclude_unset=True)
-        
+
         if not update_data:
             return {"status": "success", "message": "更新するデータがありません"}
 
         update_fields = []
         values = []
-        
+
         for key, value in update_data.items():
             # SQLの「カラム名 = %s」の部分を作る
             update_fields.append(f"{key} = %s")
             # 空文字 "" が送られてきた場合は None (NULL) に変換する処理を入れるとDBが安定します
             values.append(value if value != "" else None)
-            
+
         # 更新日時(updated_at)を追加
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
-        
+
         # SQL文を組み立て
         sql = f"UPDATE users SET {', '.join(update_fields)} WHERE user_id = %s"
         values.append(TEST_USER_ID)
-        
+
         # デバッグ用：どんなSQLが実行されるかサーバーのログに出す
         print(f"Executing SQL: {sql} with values: {values}")
-        
+
         cur.execute(sql, tuple(values))
         conn.commit()
-        
+
         return {"status": "success", "message": "プロフィールを更新しました！"}
     except Exception as e:
         conn.rollback()
@@ -174,7 +185,6 @@ def update_user_profile(profile: UserProfileUpdate):
     finally:
         cur.close()
         conn.close()             
-
 
 
 @router.get("/{user_id}", summary="IDでユーザーを取得する")

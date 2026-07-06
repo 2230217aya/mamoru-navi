@@ -22,7 +22,7 @@ import DisasterModeContent from './DisasterModeContent';
 
 // ===== Types =====
 type OfficeService = {
-  id: number;
+  id: string;
   title: string;
   number: string;
 };
@@ -43,6 +43,7 @@ type Props = {
   lastUpdate: string;
   onRefresh: () => void;
   selectedShelter: Shelter | null;
+  facilityId: string;
 };
 
 const MODES = {
@@ -56,7 +57,8 @@ export default function HomeBottomSheet({
   loading,
   lastUpdate,
   onRefresh,
-  selectedShelter
+  selectedShelter,
+  facilityId,
 }: Props) {
 
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -105,7 +107,10 @@ export default function HomeBottomSheet({
               style={styles.reserveButton
                 
               }
-             onPress={() => router.push('../reservation')}
+             onPress={() => router.push({
+              pathname: '../reservation',
+              params: { facilityId }, // 変わっていない
+            })}
             >
               <Text style={styles.reserveButtonText}>
                 予約

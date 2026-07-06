@@ -9,15 +9,6 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-class FacilityCreate(BaseModel):
-    name: str
-    type_id: str
-    latitude: float
-    longitude: float
-    business_hours: Optional[str] = None
-    closed_days: Optional[str] = None
-
-
 @router.get("/", summary="全施設を取得する（typeで絞り込み可）")
 def get_facilities(type: Optional[str] = None):
     with get_db() as conn:

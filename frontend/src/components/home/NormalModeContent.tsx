@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 // 窓口サービス情報
 type OfficeService = {
-  id: number;
+  id: string;
   title: string;
   number: string;
 };

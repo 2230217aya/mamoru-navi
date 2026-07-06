@@ -1,12 +1,11 @@
-//frontend\src\screens\UserHomeScreen.tsx
 // ===== アイコン =====
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@expo/vector-icons';
 
 // ===== 地図 =====
 import MapView, { Marker, Polyline, UrlTile, Callout } from "react-native-maps";
 
 // ===== 画面遷移 =====
-import { router } from "expo-router";
+import { useFocusEffect, router } from 'expo-router';
 
 // ===== BottomSheet =====
 import HomeBottomSheet from "../components/home/HomeBottomSheet";
@@ -14,7 +13,7 @@ import HomeBottomSheet from "../components/home/HomeBottomSheet";
 import Constants from "expo-constants";
 
 // ===== Reanimated =====
-import "react-native-reanimated";
+import 'react-native-reanimated';
 
 // ===== Gesture Handler =====
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -37,7 +36,7 @@ import {
 } from "react-native";
 
 // ===== React =====
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 // ===== 災害警報バナー =====
 import EmergencyAlertBanner from "../components/home/EmergencyAlertBanner";
@@ -59,6 +58,8 @@ import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 // watchHeadingAsync のために必要
 import * as Location from "expo-location";
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
 // ===== モード定義 =====
 const MODES = {
   NORMAL: "normal",
@@ -67,7 +68,7 @@ const MODES = {
 
 // ===== 型定義 =====
 type OfficeService = {
-  id: number;
+  id: string;
   title: string;
   number: string;
 };
@@ -85,47 +86,26 @@ type Shelter = {
 const QUICK_SEARCH_ITEMS = [
   {
     id: 1,
-    title: "市区役所",
+    title: '市区役所',
   },
   {
     id: 2,
-    title: "図書館",
+    title: '図書館',
   },
   {
     id: 3,
-    title: "体育館",
+    title: '体育館',
   },
 ];
 
-// ===== 平常時施設情報の仮データ =====
-const MOCK_OFFICE_SERVICES: OfficeService[] = [
-  {
-    id: 1,
-    title: "証明書の発行",
-    number: "22",
-  },
-  {
-    id: 2,
-    title: "住所の変更・印鑑登録",
-    number: "57",
-  },
-  {
-    id: 3,
-    title: "マイナンバー",
-    number: "132",
-  },
-  {
-    id: 4,
-    title: "戸籍の提出・相談",
-    number: "12",
-  },
-];
 
 // コンポーネント自体を any でキャストして使う
 const RootView = GestureHandlerRootView as any;
 
 // frontend/src/screens/UserHomeScreen.tsx
 
+=======
+>>>>>>> 666b21c (予約)
 export default function UserHome() {
   // ---------------------------------------------------------
   // 1. 画面表示・UI状態 (States)
@@ -163,10 +143,37 @@ export default function UserHome() {
   // ===== MapView参照 =====
   const mapRef = useRef<MapView | null>(null);
   const [officeServices, setOfficeServices] = useState<OfficeService[]>([]); // 施設情報
-  const [facilityLocation] = useState({
-    latitude: 34.6937,
-    longitude: 135.5023,
-  });
+  // ===== BottomSheet表示状態 =====
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+  
+// ===== 選択されたクイック検索 =====
+const [selectedQuickSearch, setSelectedQuickSearch] =
+  useState<string | null>(null);
+  // ===== 現在モード =====
+  const [mode, setMode] = useState(MODES.NORMAL);
+
+  // ===== 施設サービス一覧 =====
+  const [officeServices, setOfficeServices] =
+    useState<OfficeService[]>([]);
+  
+  // ===== 施設ID =====
+  const [facilityId, setFacilityId] = useState<string | null>(null);
+
+  // ===== MapView参照 =====
+  const mapRef = useRef<MapView | null>(null);
+
+  // ===== ローディング状態 =====
+  const [loading, setLoading] = useState(false);
+
+  // ===== 最終更新時刻 =====
+  const [lastUpdate, setLastUpdate] = useState('');
+
+  // ===== 施設位置 =====
+  const [facilityLocation, setFacilityLocation] =
+    useState({
+      latitude: 34.6937,
+      longitude: 135.5023,
+    });
 
   // タイル保存先のパス設定（オフライン地図に必須）
   const TILE_DIR = (ExpoFileSystem as any).documentDirectory?.endsWith("/")
@@ -192,72 +199,80 @@ export default function UserHome() {
    * 避難所リストの取得
    */
   const fetchShelters = async () => {
-    try {
-      const baseUrl = getBaseUrl();
-      const url = `${baseUrl}/shelters/`;
+  try {
+    const url = `${API_BASE_URL}/facilities/?type=city_hall&name=${encodeURIComponent('大阪市役所')}`;
+    console.log('Fetching:', url);
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    const data = await response.json();
+    
+    console.log('Data received:', data);
 
-      console.log("オンライン避難所API通信先:", url);
-
-      const response = await fetch(`${baseUrl}/shelters/`, {
-        method: "GET",
-        headers: API_HEADERS,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log("オンライン避難所APIエラー:", response.status);
-        console.log("エラー詳細:", errorText);
-        return;
-      }
-
-      const data = await response.json();
-
-      console.log("オンライン避難所データ取得成功:", data);
-      console.log("オンライン避難所件数:", data.length);
-
-      setShelters(data);
-    } catch (error) {
-      console.log("オンライン避難所データ取得エラー:", error);
+    if (data.length > 0) {
+      console.log('Setting facilityId:', data[0].facility_id);
+      setFacilityId(data[0].facility_id);
+    } else {
+      console.log('データを取得できませんでした: ', data);
     }
-  };
-
-  /**
-   * 平常時：避難所混雑状況の取得
-   */
+  } catch (error) {
+    console.log('施設ID取得エラー:', error);
+  }
+};
 
   // ===== API取得 =====
-  const fetchOfficeServices = async () => {
-    try {
-      setLoading(true);
-      const baseUrl = getBaseUrl();
-      const response = await fetch(`${baseUrl}/shelters/crowd-counts`, {
-        method: "GET",
-        headers: API_HEADERS,
-      });
+const fetchOfficeServices = async () => {
+  if (!facilityId) return;
+  try {
+    // ===== ローディング開始 =====
+    setLoading(true);
 
-      if (!response.ok) throw new Error("平常時APIエラー");
-      const result = await response.json();
+    // ===== バックエンドAPIから取得 =====
+    const response = await fetch(
+      `${API_BASE_URL}/facilities/${facilityId}/office-services`
+    );
 
-      if (result.crowd_counts) {
-        setOfficeServices(result.crowd_counts);
-      } else {
-        setOfficeServices(MOCK_OFFICE_SERVICES);
-      }
-
-      setLastUpdate(
-        new Date().toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    } catch (error) {
-      console.log("❌ 平常時APIエラー:", error);
-      setOfficeServices(MOCK_OFFICE_SERVICES);
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
     }
-  };
 
+    const data = await response.json();
+
+    setOfficeServices(data);
+
+    // ===== 更新時間保存 =====
+    setLastUpdate(
+      new Date().toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    );
+  } catch (error) {
+    // ===== エラー表示 =====
+    console.log(error);
+    setOfficeServices([]);
+  } finally {
+    // ===== ローディング終了 =====
+    setLoading(false);
+  }
+};
+
+// ===== 施設IDを一度だけ取得 =====
+  useEffect(() => {
+    fetchFacilityId();
+  }, []);
+
+  // ===== 初期読み込み =====
+  useFocusEffect(
+    useCallback(() => {
+      if (facilityId) {
+        fetchOfficeServices();
+      }
+    }, [facilityId])
+  );
+
+  // ===== 市区役所へ移動 =====
+  
   /**
    * 災害時：避難計画（ルート）の取得
    */
@@ -342,14 +357,17 @@ export default function UserHome() {
   // 6. 地図操作関数 (Map Actions)
   // ---------------------------------------------------------
   const moveToCityHall = () => {
+
     mapRef.current?.animateToRegion(
       {
         latitude: 34.6937,
         longitude: 135.5023,
+
+        // ===== 地図拡大率 =====
         latitudeDelta: 0.002,
         longitudeDelta: 0.002,
       },
-      1000,
+      1000
     );
   };
 
@@ -471,13 +489,16 @@ export default function UserHome() {
   return (
     <RootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
-        {/* ===== 地図本体 ===== */}
+
+        {/* ===== 地図 ===== */}
         <MapView
           ref={mapRef}
           style={styles.map}
           initialRegion={{
             latitude: facilityLocation.latitude,
             longitude: facilityLocation.longitude,
+
+            // ===== 初期地図拡大率 =====
             latitudeDelta: 0.002,
             longitudeDelta: 0.002,
           }}
@@ -505,14 +526,16 @@ export default function UserHome() {
             />
           )}
           {mode === MODES.NORMAL ? (
-            // ===== 2. 平常モード：施設マーカーのみ表示 =====
+
+            // ===== 平常モード施設マーカー =====
             <Marker
               coordinate={facilityLocation}
               title="大阪市役所"
               description="公共施設"
             />
+
           ) : (
-            // ===== 3. 災害モード：ナビゲーション表示（複数重ねる） =====
+
             <>
               {/* ① [線] 避難ルート本体：remainingRoute（自分より先）だけを表示 */}
               {remainingRoute.length > 0 && (
@@ -556,13 +579,13 @@ export default function UserHome() {
               {/* ④ [点] 周辺の避難所リスト */}
               {/* ===== 避難所マーカー ===== */}
               {shelters.map((shelter) => (
-                <Marker
+              <Marker
                   key={shelter.shelter_id}
                   coordinate={{
                     latitude: shelter.latitude,
                     longitude: shelter.longitude,
                   }}
-                  pinColor="red"
+                pinColor="red"
                   title={shelter.name}
                   description={`${shelter.address} / 収容人数: ${shelter.capacity}人`}
                   onPress={() => {
@@ -597,10 +620,11 @@ export default function UserHome() {
                   pinColor={isOnline ? "red" : "orange"}
                   title="指定避難所"
                   zIndex={15}
-                />
+              />
               )}
             </>
           )}
+
         </MapView>
 
         {/* 到着ポップアップ */}
@@ -645,16 +669,22 @@ export default function UserHome() {
 
         {/* ===== ヘッダー ===== */}
         <View style={styles.header}>
+
           {/* ===== メニューボタン ===== */}
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => router.push("../offline-data")}
+            onPress={() => router.push('../offline-data')}
           >
-            <Ionicons name="menu" size={28} color="#333" />
+            <Ionicons
+              name="menu"
+              size={28}
+              color="#333"
+            />
           </TouchableOpacity>
 
           {/* ===== 検索欄 ===== */}
           <View style={styles.searchContainer}>
+
             <Ionicons
               name="search"
               size={20}
@@ -672,30 +702,37 @@ export default function UserHome() {
           {/* ===== マイページ ===== */}
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => router.push("../my-page")}
+            onPress={() => router.push('../my-page')}
           >
             <Image
-              source={require("../../assets/images/userpage.png")}
+              source={require('../../assets/images/userpage.png')}
               style={{ width: 32, height: 32 }}
             />
           </TouchableOpacity>
+
         </View>
 
         {/* ===== 平常 / 災害モード切替 ===== */}
         {mode === MODES.NORMAL ? (
+
           // ===== 平常モード：クイック検索 =====
           <View style={styles.quickSearchContainer}>
+
             {QUICK_SEARCH_ITEMS.map((item) => (
+
               <TouchableOpacity
                 key={item.id}
                 // クイック検索ボタンの選択状態を判定する場所
                 style={[
                   styles.quickSearchButton,
                   selectedQuickSearch === item.title &&
-                    styles.activeQuickSearchButton,
+                    styles.activeQuickSearchButton
                 ]}
                 onPress={() => {
+
+                  
                   if (selectedQuickSearch === item.title) {
+
                     setSelectedQuickSearch(null);
 
                     setShowBottomSheet(false);
@@ -703,20 +740,31 @@ export default function UserHome() {
                     return;
                   }
 
+                  
                   setSelectedQuickSearch(item.title);
 
-                  if (item.title === "市区役所") {
+                 
+                  if (item.title === '市区役所') {
+
                     moveToCityHall();
 
                     setShowBottomSheet(true);
                   }
                 }}
               >
-                <Text style={styles.quickSearchText}>{item.title}</Text>
+
+                <Text style={styles.quickSearchText}>
+                  {item.title}
+                </Text>
+
               </TouchableOpacity>
+
             ))}
+
           </View>
+
         ) : (
+
           // ===== 災害モード：警報表示 =====
           <EmergencyAlertBanner
             level="5"
@@ -724,19 +772,25 @@ export default function UserHome() {
             message="大阪府北部で地震発生"
             levelText="震度5弱"
           />
+
         )}
 
         {/* ===== モード切替（開発用） ===== */}
         <View style={styles.modeContainer}>
-          <Text style={styles.modeText}>開発環境のみ表示</Text>
+
+          <Text style={styles.modeText}>
+            開発環境のみ表示
+          </Text>
 
           {/* ===== 平常モードボタン ===== */}
           <TouchableOpacity
             style={[
               styles.modeButton,
-              mode === MODES.NORMAL && styles.activeModeButton,
+              mode === MODES.NORMAL &&
+              styles.activeModeButton
             ]}
             onPress={() => {
+
               // ===== 平常モードへ変更 =====
               setMode(MODES.NORMAL);
 
@@ -744,24 +798,28 @@ export default function UserHome() {
               setShowBottomSheet(false);
             }}
           >
+
             <Text
               style={[
                 styles.modeText,
-                mode === MODES.NORMAL && styles.activeModeText,
+                mode === MODES.NORMAL &&
+                styles.activeModeText
               ]}
             >
               平常
             </Text>
+
           </TouchableOpacity>
 
           {/* ===== 災害モードボタン ===== */}
           <TouchableOpacity
             style={[
               styles.modeButton,
-              mode === MODES.DISASTER && styles.activeModeButton,
+              mode === MODES.DISASTER &&
+              styles.activeModeButton
             ]}
             onPress={() => {
-              console.log("👆 災害ボタンが押されました");
+
               // ===== 災害モードへ変更 =====
               setMode(MODES.DISASTER);
 
@@ -775,73 +833,105 @@ export default function UserHome() {
               // 2. 少し遅延させてから（座標がセットされてから）移動
               setTimeout(() => {
                 if (destination) {
-                  mapRef.current?.animateToRegion(
-                    {
-                      latitude: destination.latitude,
-                      longitude: destination.longitude,
-                      latitudeDelta: 0.003,
-                      longitudeDelta: 0.003,
-                    },
-                    1000,
-                  );
+              mapRef.current?.animateToRegion(
+                {
+                  latitude: destination.latitude,
+                  longitude: destination.longitude,
+
+                  // ===== 災害モード時の拡大率 =====
+                  latitudeDelta: 0.003,
+                  longitudeDelta: 0.003,
+                },
+                1000
+              );
                 }
               }, 500);
             }}
           >
+
             <Text
               style={[
                 styles.modeText,
-                mode === MODES.DISASTER && styles.activeModeText,
+                mode === MODES.DISASTER &&
+                styles.activeModeText
               ]}
             >
               災害
             </Text>
+
           </TouchableOpacity>
+
         </View>
 
         {/* ===== BottomSheet ===== */}
-        {showBottomSheet && (
+        {showBottomSheet && facilityId && (
           <HomeBottomSheet
             mode={mode}
             officeServices={officeServices}
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
+<<<<<<< HEAD
             selectedShelter={selectedShelter}
+=======
+            facilityId={facilityId}
+>>>>>>> 666b21c (予約)
           />
         )}
 
         {/* ===== 詳細モーダル ===== */}
         <Modal visible={showDetail} transparent animationType="slide">
           <View style={styles.modalOverlay}>
+
             <View style={styles.detailModal}>
+
               {/* ===== モーダルハンドル ===== */}
               <View style={styles.modalHandle} />
 
               {/* ===== タイトル ===== */}
-              <Text style={styles.modalTitle}>避難所詳細情報</Text>
+              <Text style={styles.modalTitle}>
+                避難所詳細情報
+              </Text>
 
               {/* ===== 情報 ===== */}
-              <Text style={styles.modalText}>現在収容人数：12人</Text>
+              <Text style={styles.modalText}>
+                現在収容人数：12人
+              </Text>
 
-              <Text style={styles.modalText}>利用可能：毛布・水・食料</Text>
+              <Text style={styles.modalText}>
+                利用可能：毛布・水・食料
+              </Text>
 
-              <Text style={styles.modalText}>ペット同行可能</Text>
+              <Text style={styles.modalText}>
+                ペット同行可能
+              </Text>
 
               {/* ===== 閉じるボタン ===== */}
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowDetail(false)}
               >
-                <Text style={styles.closeButtonText}>閉じる</Text>
+
+                <Text style={styles.closeButtonText}>
+                  閉じる
+                </Text>
+
               </TouchableOpacity>
+
             </View>
+
           </View>
+
         </Modal>
+
       </SafeAreaView>
-    </RootView>
+
+    </GestureHandlerRootView>
+
   );
 }
+     
+    
 
 const styles = StyleSheet.create({
   container: {
@@ -853,7 +943,7 @@ const styles = StyleSheet.create({
     height: "100%",
     position: "absolute",
   },
-  // ヘッダー
+// ヘッダー
   header: {
     position: "absolute",
     top: 0,
@@ -862,21 +952,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff9c",
 
     paddingTop: 30,
-    paddingBottom: 10,
+    paddingBottom: 10, 
     paddingHorizontal: 5,
 
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  //ヘッダーのicon
+//ヘッダーのicon
   iconButton: {
     width: 48,
     height: 48,
     justifyContent: "center",
     alignItems: "center",
   },
-  //検索欄
+//検索欄
   searchContainer: {
     flex: 1,
 
@@ -904,18 +994,18 @@ const styles = StyleSheet.create({
 
     elevation: 4,
   },
-  //検索icon
+//検索icon
   searchIcon: {
     marginRight: 8,
   },
-  //検索
+//検索
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: "#333",
   },
   // クイック検索アイテム
-  quickSearchContainer: {
+    quickSearchContainer: {
     position: "absolute",
 
     top: 85,
@@ -923,12 +1013,12 @@ const styles = StyleSheet.create({
     right: 20,
     flexDirection: "row",
     padding: 6,
-  },
-  activeQuickSearchButton: {
+    },
+    activeQuickSearchButton: {
     backgroundColor: "#d0d0d0",
-  },
+},
 
-  quickSearchButton: {
+    quickSearchButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -937,15 +1027,15 @@ const styles = StyleSheet.create({
     marginRight: 6,
     backgroundColor: "#ffffff",
     borderRadius: 16,
-  },
+    },
 
-  quickSearchText: {
+    quickSearchText: {
     color: "#666",
     fontSize: 12,
     fontWeight: "bold",
-  },
+    },
 
-  //下の情報欄
+//下の情報欄
   bottomCard: {
     position: "absolute",
     bottom: 0,
@@ -984,234 +1074,242 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-  },
-  infoRow: {
+},
+infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 4,
-  },
+  marginTop: 4,
+},
 
-  closedText: {
-    fontSize: 13,
-    color: "#666",
-  },
+closedText: {
+  fontSize: 13,
+  color: '#666',
+},
 
-  reserveButton: {
-    backgroundColor: "#FFEE37",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    width: "30%",
-    alignItems: "center",
-  },
 
-  reserveButtonText: {
-    color: "#000000",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+reserveButton: {
+  backgroundColor: '#FFEE37',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+  width: '30%',
+  alignItems: 'center',
+},
 
-  detailLink: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "500",
-  },
+reserveButtonText: {
+  color: '#000000',
+  fontSize: 14,
+  fontWeight: '600',
+},
 
-  updateRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 6,
-  },
+detailLink: {
+  color: '#007AFF',
+  fontSize: 14,
+  fontWeight: '500',
+},
 
-  updateText: {
-    fontSize: 12,
-    color: "#888",
-  },
-  refreshButton: {
-    padding: 4,
-  },
+updateRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 6,
+},
 
-  statsContainer: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 10,
-  },
-  rowItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  usuallystatBox: {
-    flex: 1,
-    backgroundColor: "#eeeeee",
-    padding: 12,
-    borderRadius: 12,
-  },
-  usuallyTitle: {
-    flex: 1,
+updateText: {
+  
+  fontSize: 12,
+  color: '#888',
+},
+refreshButton: {
+  padding: 4,
+},
+
+
+statsContainer: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 10,
+},
+rowItem: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+usuallystatBox: {
+  flex: 1,
+  backgroundColor: '#eeeeee',
+  padding: 12,
+  borderRadius: 12,
+  
+  
+},
+usuallyTitle: {
+  flex: 1,              
     fontWeight: "bold",
-    fontSize: 14,
+  fontSize: 14,
     color: "#000000",
-  },
+},
 
-  numberText: {
-    fontSize: 14,
+numberText: {
+  fontSize: 14,
     fontWeight: "bold",
     color: "#1976d2",
     alignSelf: "flex-end",
-  },
-  statBox: {
-    flex: 1,
+},
+statBox: {
+   flex: 1,
     backgroundColor: "#FFEE37",
-    padding: 12,
-    borderRadius: 12,
-    height: 140,
+  padding: 12,
+  borderRadius: 12,
+  height: 140,
 
     position: "relative",
-  },
-  statBox2: {
-    flex: 1,
+},
+statBox2: {
+  flex: 1,
     backgroundColor: "#D9D9D9",
-    padding: 12,
-    borderRadius: 12,
+  padding: 12,
+  borderRadius: 12,
     alignItems: "center",
-  },
-  statValueLeft: {
+},
+statValueLeft: {
     position: "absolute",
-    bottom: 10,
-    left: 13,
+  bottom: 10,
+  left: 13,
 
-    fontSize: 30,
+  fontSize: 30,
     fontWeight: "bold",
     color: "#000000",
-  },
-  //移動中・収容されるテキスト
-  statTitle: {
+},
+//移動中・収容されるテキスト
+statTitle: {
     position: "absolute",
-    top: 10,
-    left: 10,
-    right: 0,
+  top: 10,
+  left: 10,
+  right: 0,
     fontWeight: "bold",
 
-    fontSize: 18,
+  fontSize: 18,
     color: "#000000",
-  },
+},
 
-  statValue: {
+statValue: {
     position: "absolute",
-    bottom: 10,
-    left: 10,
+  bottom: 10,
+  left: 10,
 
-    fontSize: 29,
+  fontSize: 29,
     fontWeight: "bold",
     color: "#1976d2",
-  },
-  statImage: {
+},
+statImage: {
     position: "absolute",
-    bottom: 8,
-    right: 8,
-    width: 50,
-    height: 50,
-  },
+  bottom: 8,
+  right: 8,
+  width: 50,
+  height: 50,
+},
 
-  modalOverlay: {
-    flex: 1,
+
+
+
+modalOverlay: {
+  flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.03)",
-  },
+},
 
-  detailModal: {
+detailModal: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  padding: 24,
     minHeight: "90%",
-  },
+},
 
-  modalHandle: {
-    width: 50,
-    height: 5,
+modalHandle: {
+  width: 50,
+  height: 5,
     backgroundColor: "#ccc",
-    borderRadius: 10,
+  borderRadius: 10,
     alignSelf: "center",
-    marginBottom: 20,
-  },
+  marginBottom: 20,
+},
 
-  modalTitle: {
-    fontSize: 22,
+modalTitle: {
+  fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 20,
-  },
+  marginBottom: 20,
+},
 
-  modalText: {
-    fontSize: 16,
-    marginBottom: 12,
+modalText: {
+  fontSize: 16,
+  marginBottom: 12,
     color: "#444",
-  },
+},
 
-  closeButton: {
-    marginTop: 20,
+closeButton: {
+  marginTop: 20,
     backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    borderRadius: 12,
+  paddingVertical: 12,
+  borderRadius: 12,
     alignItems: "center",
-  },
+},
 
-  closeButtonText: {
+closeButtonText: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 16,
-  },
+  fontSize: 16,
+},
 
   // モード切替
   // 開発環境のみ表示　start
   modeContainer: {
     position: "absolute",
 
-    top: 180,
-    left: 20,
-    right: 20,
+  top: 180,
+  left: 20,
+  right: 20,
 
     flexDirection: "row",
 
     backgroundColor: "white",
 
-    borderRadius: 16,
+  borderRadius: 16,
 
-    padding: 6,
+  padding: 6,
 
-    gap: 8,
+  gap: 8,
 
-    elevation: 4,
-  },
+  elevation: 4,
+},
 
-  modeButton: {
-    flex: 1,
+modeButton: {
+  flex: 1,
 
-    paddingVertical: 1,
+  paddingVertical: 1,
 
-    borderRadius: 12,
+  borderRadius: 12,
 
     alignItems: "center",
-  },
+},
 
-  activeModeButton: {
+activeModeButton: {
     backgroundColor: "#c1defa",
-  },
+},
 
-  modeText: {
-    fontSize: 15,
+modeText: {
+  fontSize: 15,
     fontWeight: "600",
 
     color: "#8f8c8c",
-  },
+},
 
-  activeModeText: {
+activeModeText: {
     color: "white",
-  },
+},
   navInfoPanel: {
     position: "absolute",
     top: 250, // ★170から250くらいに下げると、開発ボタン(180)の下に綺麗に並びます
@@ -1269,4 +1367,4 @@ const styles = StyleSheet.create({
   },
   qrButtonText: { fontWeight: "bold", fontSize: 16 },
 });
-// 開発環境のみ表示　end
+ // 開発環境のみ表示　end
