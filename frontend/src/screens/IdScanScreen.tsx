@@ -13,6 +13,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database";
 import * as Crypto from "expo-crypto";
+import Constants from "expo-constants";
 
 export default function IDScanScreen() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function IDScanScreen() {
 
   // 職員用設定 (本来は設定画面やDBから取得)
   const STAFF_CONFIG = {
-    location_id: "123e4567-e89b-12d3-a456-426614174000",
+    location_id: "11111111-1111-1111-1111-111111111111",
     scan_mode: "shelter",
   };
 
@@ -68,9 +69,16 @@ export default function IDScanScreen() {
       if (!photo) throw new Error("写真の撮影に失敗しました");
 
       // --- 2. API接続先の決定 (ここを維持) ---
+      const debuggerHost = Constants.expoConfig?.hostUri;
+      const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
+
       const baseUrl =
         process.env.EXPO_PUBLIC_API_URL ||
-        "https://mamoru-navi-api-aya223.loca.lt";
+        (localIp === "localhost" || localIp === "127.0.0.1"
+          ? "http://localhost:8000"
+          : `http://${localIp}:8000`);
+
+      console.log(`📡 [Scan] 接続先: ${baseUrl}/scan/qr-code`);
 
       // --- 3. APIに送信 ---
       const response = await fetch(`${baseUrl}/scan/id-card`, {

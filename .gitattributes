@@ -1,0 +1,2 @@
+# シェルスクリプトは常に LF (Linux形式) で扱う設定
+*.sh text eol=lf

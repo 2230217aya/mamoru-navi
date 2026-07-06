@@ -24,7 +24,7 @@ INSERT INTO users (
     phone_number, email, address, home_location, user_role,
     created_at 
 ) VALUES (
-    '123e4567-e89b-12d3-a456-426614174000', 
+    '11111111-1111-1111-1111-111111111111', 
     'テストユーザー太郎', 
     '男性', 
     '1990-01-01', 

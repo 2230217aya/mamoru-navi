@@ -16,6 +16,7 @@ import { LocalDB } from "@/src/db/database";
 import Constants from "expo-constants";
 import { Feather } from "@expo/vector-icons"; // Figmaと同じアップロードアイコン用
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
 // 設定時間（ミリ秒）
 const SYNC_INTERVAL = 10 * 1000; // 1時間 (テスト用に短くしてもOK)1 * 60 * 60 * 1000;
@@ -25,13 +26,6 @@ export default function dashboard() {
   // ★ 状態管理
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  //ベースURLを取得する関数（共通化用）
-  const getBaseUrl = () => {
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-    return process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-  };
 
   //未送信件数取得
   const fetchCount = async () => {
@@ -76,7 +70,7 @@ export default function dashboard() {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: API_HEADERS,
       });
 
       // ★追加：エラーが返ってきた場合に理由を表示
@@ -116,7 +110,7 @@ export default function dashboard() {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: API_HEADERS,
       });
 
       if (!response.ok) {
@@ -195,7 +189,10 @@ export default function dashboard() {
   return (
     <View style={styles.container}>
       {/* 右上のアイコン */}
-      <Pressable onPress={() => router.push("/user-list")} style={styles.userIconButton}>
+      <Pressable
+        onPress={() => router.push("../user-list")}
+        style={styles.userIconButton}
+      >
         <Image
           source={require("@/assets/images/dashboard-userIcon.png")}
           style={styles.userIcon}
