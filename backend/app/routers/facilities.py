@@ -11,29 +11,26 @@ router = APIRouter(
 
 class FacilityCreate(BaseModel):
     name: str
-    type: str
-    address: str
+    type_id: str
+    latitude: float
+    longitude: float
+    business_hours: Optional[str] = None
+    closed_days: Optional[str] = None
 
-@router.post("/", summary="施設を作成する")
-def create_facility(data: FacilityCreate):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO facilities (name, type, address)
-                VALUES (%s, %s, %s)
-                RETURNING facility_id
-            """, (data.name, data.type, data.address))
-            conn.commit()
-            return {"message": "facility created", "facility_id": str(cur.fetchone()[0])}
 
-@router.get("/", summary="全施設を取得する")
+@router.get("/", summary="全施設を取得する（typeで絞り込み可）")
 def get_facilities(type: Optional[str] = None):
     with get_db() as conn:
         with conn.cursor() as cur:
-            query = "SELECT facility_id, name, type, address FROM facilities"
+            query = """
+                SELECT f.facility_id, f.name, ft.type_name,
+                       f.latitude, f.longitude, f.business_hours, f.closed_days
+                FROM facilities f
+                JOIN facility_types ft ON ft.type_id = f.type_id
+            """
             params = []
             if type:
-                query += " WHERE type = %s"
+                query += " WHERE ft.type_name = %s"
                 params.append(type)
             cur.execute(query, params)
             facilities = cur.fetchall()
@@ -42,7 +39,10 @@ def get_facilities(type: Optional[str] = None):
                     "facility_id": str(f[0]),
                     "name": f[1],
                     "type": f[2],
-                    "address": f[3]
+                    "latitude": f[3],
+                    "longitude": f[4],
+                    "business_hours": f[5],
+                    "closed_days": f[6],
                 }
                 for f in facilities
             ]
@@ -51,7 +51,13 @@ def get_facilities(type: Optional[str] = None):
 def get_facility(facility_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT facility_id, name, type, address FROM facilities WHERE facility_id = %s", (facility_id,))
+            cur.execute("""
+                SELECT f.facility_id, f.name, ft.type_name,
+                       f.latitude, f.longitude, f.business_hours, f.closed_days
+                FROM facilities f
+                JOIN facility_types ft ON ft.type_id = f.type_id
+                WHERE f.facility_id = %s
+            """, (facility_id,))
             f = cur.fetchone()
             if not f:
                 raise HTTPException(status_code=404, detail="施設が見つかりません!")
@@ -59,5 +65,38 @@ def get_facility(facility_id: str):
                 "facility_id": str(f[0]),
                 "name": f[1],
                 "type": f[2],
-                "address": f[3]
+                "latitude": f[3],
+                "longitude": f[4],
+                "business_hours": f[5],
+                "closed_days": f[6],
             }
+        
+@router.get("/{facility_id}/office-services", summary="窓口サービス情報（現在の受付番号）を取得")
+def get_office_services(facility_id: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                  fp.purpose_id,
+                  fp.purpose_name,
+                  COALESCE(
+                    MAX(fr.issued_number) FILTER (
+                      WHERE fr.status = 'in_progress' AND DATE(fr.created_at) = CURRENT_DATE
+                    ), 0
+                  ) AS number
+                FROM facility_purposes fp
+                JOIN facilities f ON f.type_id = fp.type_id
+                LEFT JOIN facility_reservations fr
+                  ON fr.purpose_id = fp.purpose_id AND fr.facility_id = f.facility_id
+                WHERE f.facility_id = %s
+                GROUP BY fp.purpose_id, fp.purpose_name
+                ORDER BY fp.purpose_name
+            """, (facility_id,))
+            rows = cur.fetchall()
+            if not rows:
+                raise HTTPException(status_code=404, detail="この施設の窓口サービス情報が見つかりません")
+
+            return [
+                {"id": str(r[0]), "title": r[1], "number": str(r[2])}
+                for r in rows
+            ]

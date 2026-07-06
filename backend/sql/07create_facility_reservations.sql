@@ -1,6 +1,5 @@
 -- 平常時の公共施設（施設の予約)
-
-CREATE TABLE facility_reservations (
+CREATE TABLE IF NOT EXISTS facility_reservations (
     reservation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     facility_id UUID NOT NULL,

@@ -1,5 +1,5 @@
 -- 平常時の公共施設（施設の利用目的)
-CREATE TABLE facility_purposes (
+CREATE TABLE IF NOT EXISTS facility_purposes (
     purpose_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type_id UUID NOT NULL,
     purpose_name VARCHAR(50) NOT NULL,

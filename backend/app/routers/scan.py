@@ -4,12 +4,9 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from database import get_db_connection
-import psycopg2
 from psycopg2.extras import RealDictCursor
-from typing import List
 import json
 from typing import List
-
 
 router = APIRouter(
     prefix="/scan",
@@ -49,7 +46,6 @@ class SyncResponse(BaseModel):
     message: str
     synced_count: int
 
-
 class SyncItem(BaseModel):
     queue_id: int
     transaction_id: str
@@ -60,7 +56,6 @@ class SyncItem(BaseModel):
 
 class SyncRequest(BaseModel):
     items: List[SyncItem]
-
 
 # --- 共通処理関数 (リファクタリング) ---
 # ユーザーIDが確定した後の「受付処理（DB操作）」だけを切り出した関数です
@@ -204,10 +199,6 @@ async def process_id_card_scan(request: IDScanRequest):
         cur.close()
         conn.close()
 
-
-
-
-
 @router.post("/sync", summary="オフラインで記録されたデータを一括同期する")
 def sync_offline_data(request: SyncRequest):
     conn = get_db_connection()
@@ -249,7 +240,6 @@ def sync_offline_data(request: SyncRequest):
         cur.close()
         conn.close()     
 
-
 @router.get("/users/download", summary="住民リストの差分ダウンロード(オフライン用)")
 def download_users_for_offline(updated_at: Optional[str] = None):
     conn = get_db_connection()
@@ -284,6 +274,3 @@ def download_users_for_offline(updated_at: Optional[str] = None):
     finally:
         cur.close()
         conn.close()    
-
-
- 
