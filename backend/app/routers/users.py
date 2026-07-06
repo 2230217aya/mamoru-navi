@@ -83,7 +83,22 @@ def get_user_qr_code():
         qr_code_content=qr_content_string,
         message="ユーザーIDに基づいたQRコードコンテンツを生成しました。"
     )
-
+@router.get("/my-role", summary="現在のユーザーのロールを取得")
+def get_user_role():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # TEST_USER_ID は 123e4567... を使用
+        cur.execute("SELECT user_role FROM users WHERE user_id = %s;", (TEST_USER_ID,))
+        result = cur.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+            
+        return {"status": "success", "user_role": result["user_role"]}
+    finally:
+        cur.close()
+        conn.close()        
 @router.get("/{user_id}", summary="IDでユーザーを取得する")
 def get_user(user_id: str):
     with get_db() as conn:
@@ -167,19 +182,3 @@ def update_user_profile(profile: UserProfileUpdate):
 
 # backend/app/routers/users.py
 
-@router.get("/my-role", summary="現在のユーザーのロールを取得")
-def get_user_role():
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        # TEST_USER_ID は 123e4567... を使用
-        cur.execute("SELECT user_role FROM users WHERE user_id = %s;", (TEST_USER_ID,))
-        result = cur.fetchone()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
-            
-        return {"status": "success", "user_role": result["user_role"]}
-    finally:
-        cur.close()
-        conn.close()        

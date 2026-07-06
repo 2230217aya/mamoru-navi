@@ -1,3 +1,5 @@
+//userhomes
+
 // ===== アイコン =====
 import { Ionicons } from '@expo/vector-icons';
 
@@ -38,6 +40,10 @@ import { useEffect, useState, useRef } from 'react';
 import EmergencyAlertBanner
   from '../components/home/EmergencyAlertBanner';
 
+const API_BASE_URL = "http://192.168.137.1:8000";
+const API_URL = API_BASE_URL;
+
+
 // ===== モード定義 =====
 const MODES = {
   NORMAL: 'normal',
@@ -50,22 +56,39 @@ type OfficeService = {
   title: string;
   number: string;
 };
-
+type Facility = {
+  facility_id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  business_hours?: string;
+  closed_days?: string;
+};
 // ===== クイック検索用の仮データ =====
 const QUICK_SEARCH_ITEMS = [
   {
     id: 1,
     title: '市区役所',
+    type: '市区役所',
   },
   {
     id: 2,
     title: '図書館',
+    type: '図書館',
   },
   {
     id: 3,
     title: '体育館',
+    type: '体育館',
   },
 ];
+
+const TYPE_MAP: Record<string, string> = {
+  市区役所: 'city_hall',
+  図書館: 'library',
+  体育館: 'gym',
+};
 
 // ===== 平常時施設情報の仮データ =====
 const MOCK_OFFICE_SERVICES: OfficeService[] = [
@@ -119,11 +142,8 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
   const [lastUpdate, setLastUpdate] = useState('');
 
   // ===== 施設位置 =====
-  const [facilityLocation, setFacilityLocation] =
-    useState({
-      latitude: 34.6937,
-      longitude: 135.5023,
-    });
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
 
   // ===== 現在地 =====
   const origin = {
@@ -173,19 +193,49 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
       longitude: 135.504684,
     },
   ];
+const fetchFacilities = async (type?: string | null) => {
+  try {
+    setLoading(true);
+
+const url =
+  type && type.trim().length > 0
+    ? `${API_URL}/facilities?type=${encodeURIComponent(type)}`
+    : `${API_URL}/facilities`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    setFacilities(data);
+
+    if (data.length > 0) {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: data[0].latitude,
+          longitude: data[0].longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        1000
+      );
+    }
+  } catch (e) {
+    console.log(e);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ===== API取得 =====
-  const fetchOfficeServices = async () => {
+  const fetchOfficeServices = async (facilityId?: string) => {
     try {
 
       // ===== ローディング開始 =====
       setLoading(true);
 
-      // ===== 今後API接続予定 =====
-      // const response = await axios.get(...)
-
-      // ===== 仮データ使用 =====
-      const data = MOCK_OFFICE_SERVICES;
+      const res = await fetch(
+      `${API_URL}/facilities/${facilityId}/office-services`
+        );
+      const data = await res.json();
 
       setOfficeServices(data);
 
@@ -211,24 +261,11 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
 
   // ===== 初期読み込み =====
   useEffect(() => {
-    fetchOfficeServices();
-  }, []);
+  fetchOfficeServices();
+  fetchFacilities(null); // ← 改這裡
+}, []);
 
-  // ===== 市区役所へ移動 =====
-  const moveToCityHall = () => {
 
-    mapRef.current?.animateToRegion(
-      {
-        latitude: 34.6937,
-        longitude: 135.5023,
-
-        // ===== 地図拡大率 =====
-        latitudeDelta: 0.002,
-        longitudeDelta: 0.002,
-      },
-      1000
-    );
-  };
 
   return (
 
@@ -241,23 +278,37 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
           ref={mapRef}
           style={styles.map}
           initialRegion={{
-            latitude: facilityLocation.latitude,
-            longitude: facilityLocation.longitude,
-
-            // ===== 初期地図拡大率 =====
-            latitudeDelta: 0.002,
-            longitudeDelta: 0.002,
-          }}
+          latitude: 34.6937,
+          longitude: 135.5023,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+         }}
         >
 
           {mode === MODES.NORMAL ? (
 
             // ===== 平常モード施設マーカー =====
-            <Marker
-              coordinate={facilityLocation}
-              title="大阪市役所"
-              description="公共施設"
+            <>
+            {facilities.map((facility) => (
+             <Marker
+              key={facility.facility_id}
+              coordinate={{
+                latitude: facility.latitude,
+                longitude: facility.longitude,
+              }}
+              title={facility.name}
+              description={facility.type}
+              onPress={() => {
+                console.log("marker clicked");
+
+                setSelectedFacility(facility);
+                fetchOfficeServices(facility.facility_id);
+                // 這行可以先留，但不是關鍵
+                setShowBottomSheet(true);
+              }}
             />
+            ))}
+          </>
 
           ) : (
 
@@ -348,28 +399,18 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
                   selectedQuickSearch === item.title &&
                     styles.activeQuickSearchButton
                 ]}
-                onPress={() => {
-
-                  
+               onPress={() => {
                   if (selectedQuickSearch === item.title) {
-
                     setSelectedQuickSearch(null);
 
-                    setShowBottomSheet(false);
-
+                    // ★顯示全部
+                    fetchFacilities(null);
                     return;
                   }
 
-                  
                   setSelectedQuickSearch(item.title);
-
-                 
-                  if (item.title === '市区役所') {
-
-                    moveToCityHall();
-
-                    setShowBottomSheet(true);
-                  }
+                  const dbType = TYPE_MAP[item.title];
+                   fetchFacilities(dbType);
                 }}
               >
 
@@ -483,6 +524,7 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
+            selectedFacility={selectedFacility}
           />
         )}
 

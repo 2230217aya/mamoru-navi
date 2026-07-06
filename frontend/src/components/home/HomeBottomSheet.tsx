@@ -1,5 +1,5 @@
 // ===== React =====
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { router } from 'expo-router';
 // ===== BottomSheet =====
 import BottomSheet, {
@@ -21,6 +21,15 @@ import NormalModeContent from './NormalModeContent';
 import DisasterModeContent from './DisasterModeContent';
 
 // ===== Types =====
+type Facility = {
+  facility_id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  business_hours?: string;
+  closed_days?: string;
+};
 type OfficeService = {
   id: number;
   title: string;
@@ -32,7 +41,9 @@ type Props = {
   officeServices: OfficeService[];
   loading: boolean;
   lastUpdate: string;
-  onRefresh: () => void;
+  onRefresh: (facilityId: string) => void;
+  selectedFacility: Facility | null;
+  
 };
 
 const MODES = {
@@ -46,7 +57,13 @@ export default function HomeBottomSheet({
   loading,
   lastUpdate,
   onRefresh,
+  selectedFacility,
 }: Props) {
+useEffect(() => {
+  if (!selectedFacility?.facility_id) return;
+
+  onRefresh(selectedFacility.facility_id);
+}, [selectedFacility]);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [sheetIndex, setSheetIndex] = useState(0);
@@ -63,7 +80,7 @@ export default function HomeBottomSheet({
       {/* ===== BottomSheet ===== */}
       <BottomSheet
         ref={bottomSheetRef}
-        index={0}
+        index={1}
         onChange={setSheetIndex}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
@@ -82,12 +99,13 @@ export default function HomeBottomSheet({
         <BottomSheetView style={styles.container}>
 
         <View style={styles.titleRow}>
+          
 
-          <Text style={styles.title}>
-            {mode === MODES.NORMAL
-              ? '大阪市役所'
-              : '避難所状況'}
-          </Text>
+        <Text style={styles.title}>
+          {mode === MODES.NORMAL
+            ? (selectedFacility?.name ?? '大阪市役所')
+            : '避難所状況'}
+        </Text>
 
           {mode === MODES.NORMAL && (
             <TouchableOpacity
@@ -112,7 +130,10 @@ export default function HomeBottomSheet({
               officeServices={officeServices}
               loading={loading}
               lastUpdate={lastUpdate}
-              onRefresh={onRefresh}
+              onRefresh={() =>
+                selectedFacility?.facility_id &&
+                onRefresh(selectedFacility.facility_id)
+              }
             />
           ) : (
             /* ========================= */
