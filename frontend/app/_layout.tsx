@@ -4,13 +4,99 @@ import { Stack, useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database";
 import * as Network from "expo-network";
 import Constants from "expo-constants";
+import { updateStayStats, smartAutoCache } from "@/src/utils/mapUtils";
+import * as Location from "expo-location";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
-// ★ app/ フォルダ直下のコンポーネントをインポート ★
-import HomeScreen from "./index"; // app/(tabs)/index.tsx を指す
-import MyPageScreen from "./my-page"; // app/my-page.tsx を指す
-import OfflineDataScreen from "./offline-data"; // app/offline-data.tsx を指す
-import DashboardScreen from "./dashbord"; // app/dashboard.tsx を指す
-import UserHomeScreen from "./user_home";
+const syncEvacuationPlanInBackground = async (
+  baseUrl: string,
+  userId: string,
+) => {
+  try {
+    const network = await Network.getNetworkStateAsync();
+
+    // Wi-Fi接続時のみ備蓄を実行
+    if (network.isConnected && network.type === Network.NetworkStateType.WIFI) {
+      console.log("📡 [Background Sync] 最新の避難ルートを確認中...");
+
+      const response = await fetch(`${baseUrl}/map/my-plan/${userId}`, {
+        method: "GET",
+        headers: API_HEADERS,
+      });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.status === "success" && data.plan.route_data) {
+        // 高品質なデータ（座標が一定数以上）なら上書き保存
+        if (data.plan.route_data.coordinates.length > 5) {
+          await LocalDB.saveMyEvacuationPlan(data.plan);
+          console.log("✅ [Background Sync] 避難ルートの備蓄が完了しました。");
+        }
+      }
+    }
+  } catch (e) {
+    // ネットワークエラーなどは無視してOK（平常時の裏側処理なので）
+    console.log("ℹ️ [Background Sync] 同期スキップ:", e);
+  }
+};
+
+// ★ 1. スマート・キャッシュ全体の司令塔
+const runSmartStorageManager = async (baseUrl: string, userId: string) => {
+  try {
+    const network = await Network.getNetworkStateAsync();
+
+    // Wi-Fi接続時のみ、重い処理（タイルダウンロード等）を解禁
+    const isWifi =
+      network.isConnected && network.type === Network.NetworkStateType.WIFI;
+    if (!isWifi) return;
+
+    console.log(
+      "📡 [Smart Manager] Wi-Fi接続確認。データの自動備蓄を開始します...",
+    );
+
+    // (1) 避難計画の備蓄（前回実装分）
+    const planResponse = await fetch(`${baseUrl}/map/my-plan/${userId}`, {
+      method: "GET",
+      headers: API_HEADERS,
+    });
+    if (planResponse.ok) {
+      const data = await planResponse.json();
+      if (data.status === "success" && data.plan.route_data) {
+        // 高品質データのみ保存
+        if (data.plan.route_data.coordinates.length > 5) {
+          await LocalDB.saveMyEvacuationPlan(data.plan);
+          console.log("✅ 避難ルート備蓄完了");
+
+          // ★ 追加：ルート上のタイルも自動でキャッシュ
+          const {
+            convertGeoJsonToMapPoints,
+            autoCacheTiles,
+          } = require("@/src/utils/mapUtils");
+          const points = convertGeoJsonToMapPoints(data.plan.route_data);
+          await autoCacheTiles(points);
+        }
+      }
+    }
+
+    // (2) 【解決策①】手動登録エリアの地図自動更新（自宅・職場など）
+    // 本来は my_areas テーブルなどから座標を引っ張る
+    // 今回はマイエリア設定があると仮定したフロー
+    const myAreas = [{ id: "home", lat: 34.73, lon: 135.5 }]; // ダミー
+    for (const area of myAreas) {
+      const { autoCacheTiles } = require("@/src/utils/mapUtils");
+      await autoCacheTiles([{ latitude: area.lat, longitude: area.lon }]);
+      console.log(`✅ マイエリア(${area.id})の地図を更新しました`);
+    }
+
+    // (3) 【解決策②】滞在時間ベースの学習済みエリアをキャッシュ
+    // すでに utils/mapUtils.ts にある smartAutoCache を叩くだけ
+    const { smartAutoCache } = require("@/src/utils/mapUtils");
+    await smartAutoCache();
+    console.log("✅ 頻出エリアの学習とキャッシュを完了しました");
+  } catch (e) {
+    console.log("ℹ️ [Smart Manager] スキップ:", e);
+  }
+};
 
 export default function RootLayout() {
   const router = useRouter();
@@ -20,93 +106,85 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    // --- データベース初期化 ---
+    // ★ 修正：開発中は問答無用で localhost:8000 を優先する（USBの場合）
+    const baseUrl = getBaseUrl();
+
+    console.log(`📡 接続先API: ${baseUrl}`);
+
+    const testUserId = "11111111-1111-1111-1111-111111111111";
+
+    // 1. データベース初期化
     LocalDB.init()
       .then(() => {
-        console.log("Database ready");
-        setDbReady(true); // ★ 修正：これを追加して描画を許可する
+        console.log("✅ Database initialized");
+        setDbReady(true); // ★まず「準備完了」のフラグを立てる
+
+        // ★重いダウンロード処理は、UIが描画されるのを 1秒待ってから「こっそり」始める
+        setTimeout(() => {
+          runSmartStorageManager(baseUrl, testUserId);
+        }, 10000);
       })
       .catch((err) => {
-        console.error("Database init failed", err);
-        // エラー時も一応描画させるために true にするか、エラー画面を出す
-        setDbReady(true);
+        console.error("❌ Database init failed", err);
+        setDbReady(true); // エラーでも止まらないようにフラグは立てる
       });
 
-    // 2. データベース(PostgreSQL)からロールを取得する
+    // 2. ロール取得
+    // 2. ロール取得
     const fetchUserRole = async () => {
       try {
-        const debuggerHost = Constants.expoConfig?.hostUri;
-        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-        const baseUrl =
-          process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-
-        const response = await fetch(`${baseUrl}/user/my-role`, {
+        const response = await fetch(`${baseUrl}/users/my-role`, {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "bypass-tunnel-reminder": "true",
-          },
+          headers: API_HEADERS, // bypass-tunnel-reminder もここに含まれています
         });
 
         if (!response.ok) {
+          // HTTPステータスが200以外（404, 500など）の場合の処理
           const errorText = await response.text();
-          console.log("ロール取得APIエラー:", response.status);
-          console.log("エラー詳細:", errorText);
+          console.log(`⚠️ ロール取得APIエラー: ${response.status}`);
 
-          // /user/my-role が未実装または404の場合は、住民として進める
+          // APIが未実装（404）やエラーの場合は、一般住民（citizen）として進める
           setUserRole("citizen");
           return;
         }
 
         const data = await response.json();
-
         if (data.status === "success") {
-          const role = data.user_role === "staff" ? "staff" : "citizen"; // デフォルトは citizen
+          // "staff" かそれ以外（"citizen"）を正規化してセット
+          const role = data.user_role === "staff" ? "staff" : "citizen";
           setUserRole(role);
-          console.log(`👤 ログインロール: ${data.user_role}`);
+          console.log(`👤 ログイン成功 ロール: ${role}`);
         } else {
-        // エラー時はデフォルトとして citizen にしておくなどのフォールバック
-        setUserRole("citizen");
+          // statusがsuccessでない場合
+          setUserRole("citizen");
         }
       } catch (error) {
-        console.error("ロール取得失敗:", error);
-        setUserRole("citizen"); // エラー時はデフォルトとして citizen にする
+        console.log(
+          "❌ ネットワークエラー：オフラインモード(一般住民)で開始します",
+        );
+        // ネットワーク断絶時もアプリが止まらないよう、必ずフォールバックする
+        setUserRole("citizen");
       }
     };
     fetchUserRole();
 
-    // --- 同期ロジック ---
-    let isSyncing = false; // ★防衛策2: 同期中かどうかの「ロック」
-    let consecutiveFailures = 0; // ★防衛策3: 連続失敗回数
+    // 3. 同期ロジック (checkAndSync)
+    let isSyncing = false;
+    let consecutiveFailures = 0;
 
     const checkAndSync = async () => {
-      // もし既に同期中なら、何もせず終了（二重送信防止）
       if (isSyncing) return;
-
       try {
         const networkState = await Network.getNetworkStateAsync();
-
         if (networkState.isConnected && networkState.isInternetReachable) {
-          isSyncing = true; // ロックをかける
-
-          // ★防衛策1: 5件だけ取得して送る
+          isSyncing = true;
           const pendingItems = await LocalDB.getPendingSyncs(5);
-
           if (pendingItems && pendingItems.length > 0) {
             console.log(`📡 同期開始: ${pendingItems.length}件を送信...`);
-
-            const debuggerHost = Constants.expoConfig?.hostUri;
-            const localIp = debuggerHost
-              ? debuggerHost.split(":")[0]
-              : "localhost";
-            const baseUrl =
-              process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
-
             const result = await LocalDB.syncWithServer(baseUrl, pendingItems);
-
             if (result.success) {
               console.log(`✅ 同期成功`);
-              consecutiveFailures = 0; // 成功したら失敗回数をリセット
+              consecutiveFailures = 0;
             } else {
               throw new Error(result.message);
             }
@@ -114,40 +192,76 @@ export default function RootLayout() {
         }
       } catch (error) {
         console.log(`❌ 同期エラー: ${error}`);
-        consecutiveFailures++; // 失敗したらカウントアップ
+        consecutiveFailures++;
       } finally {
-        isSyncing = false; // 処理が終わったらロックを解除
+        isSyncing = false;
       }
     };
 
-    // ★防衛策3: 動的なタイマー（バックオフ）
+    // ポーリング開始
     const startSmartPolling = () => {
-      // 基本は10秒間隔。連続失敗が多いほど、待機時間を長くする（最大2分）
-      // 例: 0回=10秒, 1回=20秒, 2回=30秒...
       const baseInterval = 10000;
       const maxInterval = 120000;
       const currentInterval = Math.min(
         baseInterval + consecutiveFailures * 10000,
         maxInterval,
       );
-
       setTimeout(async () => {
         await checkAndSync();
-        startSmartPolling(); // 終わったら、次のタイマーを再帰的にセットする
+        startSmartPolling();
       }, currentInterval);
     };
 
-    startSmartPolling(); // ループ開始
+    // 4. スマートバックグラウンドロジック (生活圏学習・キャッシュ)
+    const startBackgroundLocationLogic = (baseUrl: string, userId: string) => {
+      const INTERVAL = 2 * 60 * 1000; // 2分
 
-    // ※ クリーンアップ処理は不要な設計にしています
+      setTimeout(async () => {
+        try {
+          // --- ① 滞在場所のカウント（電波に関わらず実行） ---
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const pos = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            const { updateStayStats } = require("@/src/utils/mapUtils");
+            await updateStayStats(
+              pos.coords.latitude,
+              pos.coords.longitude,
+              0.5,
+            );
+          }
+
+          // --- ② ネットワーク系の一括処理 ---
+          // ※ sync... 関数の中でWi-Fiチェックをしているので、ここで再度IF文を書かなくても安全です
+          await syncEvacuationPlanInBackground(baseUrl, userId);
+
+          // --- ③ 滞在エリアのタイルキャッシュ ---
+          // 内部でWi-Fiチェックしているはずなので、そのまま実行
+          const { smartAutoCache } = require("@/src/utils/mapUtils");
+          await smartAutoCache();
+        } catch (e) {
+          console.log("Smart Logic Error:", e);
+        } finally {
+          // ループを維持
+          startBackgroundLocationLogic(baseUrl, userId);
+        }
+      }, INTERVAL);
+    };
+
+    // --- ★ 実行：両方のループを確実に開始する ---
+    startSmartPolling();
+    startBackgroundLocationLogic(baseUrl, testUserId);
   }, []);
 
-  // ★ 読み込みが終わるまで何も表示しない（またはスプラッシュ画面を出す）
-  if (userRole === null || !dbReady) {
-    return null;
-  }
+  // デバッグ用: どちらが原因で止まっているかログを出す
+  console.log(`Debug - userRole: ${userRole}, dbReady: ${dbReady}`);
 
-  // 関数名も RootLayout に変更
+  // ★ 読み込みが終わるまで何も表示しない（またはスプラッシュ画面を出す）
+  // if (userRole === null || !dbReady) {
+  //   return null;
+  // }
+
   return (
     // ★ Navigator を Stack に変更 ★
     <Stack

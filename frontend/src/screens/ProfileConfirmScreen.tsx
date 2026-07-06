@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import Constants from "expo-constants";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api"; // ★ APIのベースURLを取得するユーティリティ関数をインポート
 
 export default function ProfileConfirmScreen() {
   const router = useRouter();
@@ -25,14 +26,12 @@ export default function ProfileConfirmScreen() {
 
       const fetchProfile = async () => {
         try {
-          const debuggerHost = Constants.expoConfig?.hostUri;
-          const localIp = debuggerHost
-            ? debuggerHost.split(":")[0]
-            : "localhost";
-          const baseUrl =
-            process.env.EXPO_PUBLIC_API_URL || `http://${localIp}:8000`;
+          const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
 
-          const response = await fetch(`${baseUrl}/user/profile`);
+          const response = await fetch(`${baseUrl}/users/profile`, {
+            method: "GET",
+            headers: API_HEADERS,
+          });
           const data = await response.json();
 
           if (isActive && data.status === "success") {

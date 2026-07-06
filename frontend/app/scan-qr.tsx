@@ -1,4 +1,4 @@
-// frontend/app/my-page.tsx
+// frontend\app\scan-qr.tsx
 import React from "react";
 import { useRouter } from "expo-router";
 // ★ src/screens から MyPageScreen を直接インポート ★

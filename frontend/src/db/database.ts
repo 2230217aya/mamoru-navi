@@ -52,6 +52,71 @@ export class LocalDB {
         );
       `);
 
+      // 4. my_evacuation_plan (自分専用の逃げ方・ルート管理用)
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS my_evacuation_plan (
+          plan_id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL,
+          primary_shelter_id TEXT,
+          secondary_shelter_id TEXT,
+          route_data TEXT,             -- GeoJSON LineString形式のJSON文字列
+          meeting_point_name TEXT,
+          meeting_point_lat REAL,
+          meeting_point_lon REAL,
+          updated_at TEXT
+        );
+      `);
+
+      // 5. evacuation_points (一時避難場所や集合場所のマスター用)
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS evacuation_points (
+          point_id TEXT PRIMARY KEY NOT NULL,
+          name TEXT,
+          latitude REAL,
+          longitude REAL,
+          point_type TEXT,
+          description TEXT,
+          updated_at TEXT
+        );
+      `);
+
+      // 6. shelters (避難所の詳細データマスター / オフライン表示用)
+      // ※PDF P.18 の定義に準拠
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS shelters (
+          shelter_id TEXT PRIMARY KEY NOT NULL,
+          name TEXT,
+          address TEXT,
+          latitude REAL,
+          longitude REAL,
+          capacity INTEGER,
+          facilities TEXT              -- JSON形式
+        );
+      `);
+
+      // 7. user_locations (住民の位置情報ログ蓄積用 / 自動キャッシュ判定などに使用)
+      // ※PDF P.2 に準拠 (latirude は latitude に補正しています)
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS user_locations (
+          location_id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL,
+          latitude REAL NOT NULL,
+          longitude REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          recorded_at TEXT NOT NULL
+        );
+      `);
+
+      // 8. stay_stats テーブル (生活圏学習用)
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS stay_stats (
+          mesh_id TEXT PRIMARY KEY NOT NULL,
+          total_hours REAL DEFAULT 0.25,
+          last_stayed_at TEXT,
+          is_cached INTEGER DEFAULT 0
+        );
+      `);
+
       // await this.db.execAsync("DELETE FROM sync_queue;");
       // await this.db.execAsync("DELETE FROM checkins;");
       // console.log("🧹 データベースのゴミデータを強制消去しました！");
@@ -135,7 +200,6 @@ export class LocalDB {
     }
   }
 
-  // サーバーへ一括同期する処理
   // サーバーへ一括同期する処理（★引数に pendingItems を追加）
   static async syncWithServer(baseUrl: string, pendingItems: any[]) {
     try {
@@ -224,5 +288,105 @@ export class LocalDB {
       "SELECT * FROM users_cache WHERE user_id = ?;",
       [user_id],
     );
+  }
+
+  // --- マイ避難計画（オフラインナビ用） ---
+
+  // サーバーから取得した「マイ避難計画」を保存する
+  static async saveMyEvacuationPlan(plan: any) {
+    const db = await this.init();
+    await db?.runAsync(
+      `INSERT OR REPLACE INTO my_evacuation_plan 
+       (plan_id, user_id, primary_shelter_id, secondary_shelter_id, route_data, meeting_point_name, meeting_point_lat, meeting_point_lon, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        plan.plan_id,
+        plan.user_id,
+        plan.primary_shelter_id,
+        plan.secondary_shelter_id,
+        JSON.stringify(plan.route_data), // GeoJSONを文字列化して保存
+        plan.meeting_point_name,
+        plan.meeting_point_lat,
+        plan.meeting_point_lon,
+        plan.updated_at,
+      ],
+    );
+    console.log("✅ マイ避難計画(ルートデータ)をローカルに保存しました");
+  }
+
+  // オフライン時に「マイ避難計画」を取得する
+  static async getMyEvacuationPlan(user_id: string) {
+    const db = await this.init();
+    const result: any = await db?.getFirstAsync(
+      `SELECT * FROM my_evacuation_plan WHERE user_id = ? LIMIT 1;`,
+      [user_id],
+    );
+
+    if (result && result.route_data) {
+      // 文字列として保存されているJSONをオブジェクトに戻す
+      result.route_data = JSON.parse(result.route_data);
+    }
+    return result;
+  }
+
+  /**
+   * SQLiteに保存されているすべての避難計画を取得する
+   * (If文で現在地に一番近いルートを選ぶために使用)
+   */
+  static async getAllSavedPlans() {
+    const db = await this.init();
+    // 全件取得
+    const results: any[] = await db?.getAllAsync(
+      "SELECT * FROM my_evacuation_plan;",
+    );
+
+    // JSON文字列になっている route_data をオブジェクトに戻して返す
+    return results.map((plan) => ({
+      ...plan,
+      route_data:
+        typeof plan.route_data === "string"
+          ? JSON.parse(plan.route_data)
+          : plan.route_data,
+    }));
+  }
+
+  //データベースリセット
+  // database.ts 内
+  static async resetDatabaseForTest() {
+    const db = await this.init();
+    await db.execAsync("DELETE FROM my_evacuation_plan;");
+    await db.execAsync("DELETE FROM stay_stats;");
+    await db.execAsync("DELETE FROM checkins;");
+    await db.execAsync("DELETE FROM sync_queue;");
+    console.log("🧹 テスト用：全データをクリアしました");
+  }
+
+  // frontend/src/db/database.ts 内の LocalDB クラスに追加
+
+  /**
+   * テスト用：生活圏の滞在データを強制的に作成する
+   */
+  static async setupTestStayStats() {
+    const db = await this.init();
+    try {
+      // 一旦既存のテストデータを消去（重複エラー防止）
+      await db?.runAsync(
+        "DELETE FROM stay_stats WHERE mesh_id IN ('34.73:135.50', '34.69:135.50');",
+      );
+
+      // 1. 自宅(mesh_A)の偽装
+      await db?.runAsync(
+        "INSERT INTO stay_stats (mesh_id, total_hours, is_cached) VALUES ('34.73:135.50', 10, 0);",
+      );
+
+      // 2. 職場(mesh_B)の偽装
+      await db?.runAsync(
+        "INSERT INTO stay_stats (mesh_id, total_hours, is_cached) VALUES ('34.69:135.50', 10, 0);",
+      );
+
+      console.log("🛠️ テスト用の滞在データをSQLiteに注入しました");
+    } catch (e) {
+      console.error("テストデータ注入失敗", e);
+    }
   }
 }
