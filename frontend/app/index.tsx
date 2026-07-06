@@ -5,12 +5,18 @@ import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { View, ActivityIndicator, Text } from "react-native"; // Textを追加
 import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
+import { LocalDB } from "@/src/db/database";
 
 export default function Index() {
   const [role, setRole] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
+    // const clear = async () => {
+    //   await LocalDB.resetDatabaseForTest();
+    //   console.log("✅ 同期キューが空になりました");
+    // };
+    // clear();
     const fetchUserRole = async () => {
       try {
         // --- 1. 共通ユーティリティからベースURLを取得 ---

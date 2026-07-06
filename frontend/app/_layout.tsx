@@ -6,6 +6,7 @@ import * as Network from "expo-network";
 import Constants from "expo-constants";
 import { updateStayStats, smartAutoCache } from "@/src/utils/mapUtils";
 import * as Location from "expo-location";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
 
 const syncEvacuationPlanInBackground = async (
   baseUrl: string,
@@ -20,10 +21,7 @@ const syncEvacuationPlanInBackground = async (
 
       const response = await fetch(`${baseUrl}/map/my-plan/${userId}`, {
         method: "GET",
-        headers: {
-          "Bypass-Tunnel-Reminder": "true",
-          "Content-Type": "application/json",
-        },
+        headers: API_HEADERS,
       });
       if (!response.ok) return;
 
@@ -59,10 +57,7 @@ const runSmartStorageManager = async (baseUrl: string, userId: string) => {
     // (1) 避難計画の備蓄（前回実装分）
     const planResponse = await fetch(`${baseUrl}/map/my-plan/${userId}`, {
       method: "GET",
-      headers: {
-        "Bypass-Tunnel-Reminder": "true",
-        "Content-Type": "application/json",
-      },
+      headers: API_HEADERS,
     });
     if (planResponse.ok) {
       const data = await planResponse.json();
@@ -111,17 +106,8 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    // --- ★ 共通設定：baseUrl生成を1箇所に集約 ---
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-
     // ★ 修正：開発中は問答無用で localhost:8000 を優先する（USBの場合）
-    const baseUrl =
-      localIp === "localhost" ||
-      localIp === "127.0.0.1" ||
-      localIp.includes("10.144")
-        ? "http://localhost:8000"
-        : `http://${localIp}:8000`;
+    const baseUrl = getBaseUrl();
 
     console.log(`📡 接続先API: ${baseUrl}`);
 
@@ -149,10 +135,7 @@ export default function RootLayout() {
       try {
         const response = await fetch(`${baseUrl}/users/my-role`, {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "Bypass-Tunnel-Reminder": "true",
-          },
+          headers: API_HEADERS, // bypass-tunnel-reminder もここに含まれています
         });
 
         if (!response.ok) {

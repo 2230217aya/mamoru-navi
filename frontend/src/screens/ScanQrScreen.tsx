@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database"; // ★LocalDBをインポート
 import * as Crypto from "expo-crypto"; // ★UUID生成のために追加 (npx expo install expo-crypto)
 import Constants from "expo-constants";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api"; // ★ APIのベースURLを取得するユーティリティ関数をインポート
 
 export default function ScanQRScreen() {
   const router = useRouter();
@@ -58,14 +59,7 @@ export default function ScanQRScreen() {
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     try {
-      const debuggerHost = Constants.expoConfig?.hostUri;
-      const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-
-      const baseUrl =
-        process.env.EXPO_PUBLIC_API_URL ||
-        (localIp === "localhost" || localIp === "127.0.0.1"
-          ? "http://localhost:8000"
-          : `http://${localIp}:8000`);
+      const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
 
       console.log(`📡 [Scan] 接続先: ${baseUrl}/scan/qr-code`);
 
@@ -84,26 +78,41 @@ export default function ScanQRScreen() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error("サーバーエラーが発生しました");
+        // サーバーは生きていて、エラーを返してきた場合
+        // （例：500 Internal Server Error, 404 Not Found など）
+        const errorText = await response.text(); // エラーの詳細を取得
+        console.error(`❌ サーバー側エラー: ${response.status} ${errorText}`);
+
+        // 500番台は「サーバーのバグ」なので、オフラインモードにはせず
+        // アラートを出して終了する（catchブロックのオフライン処理へ行かせない）
+        Alert.alert(
+          "サーバーエラー",
+          `サーバー側で問題が発生しました (${response.status})`,
+        );
+        setScanned(false);
+        return;
       }
 
+      // 成功した場合
       const result = await response.json();
-
       router.push({
         pathname: "/scan-result",
         params: { result: JSON.stringify(result) },
       });
-    } catch (error) {
+    } catch (error: any) {
       // エラーまたはタイムアウト時はタイマーを解除
       clearTimeout(timeoutId);
-      // ★ タイムアウトでキャンセルされたかどうかのログ
-      if ((error as Error).name === "AbortError") {
+      // もし response.ok の手前で Alert.alert して return していれば、ここには来ないか、
+      // タイムアウトや物理的な通信切断時のみここに来る。
+
+      if (error.name === "AbortError") {
         console.log("通信タイムアウト: オフラインモードに切り替えます");
       } else {
-        console.log("通信エラー: オフラインモードに切り替えます", error);
+        // fetch自体が失敗（TypeErrorなど）
+        console.log("通信不能: オフラインモードに切り替えます", error);
       }
 
-      console.error("API通信エラーの詳細:", error);
+      // 以下、オフライン保存処理（既存のまま）
       console.log("Offline detected, saving to local DB...");
 
       try {

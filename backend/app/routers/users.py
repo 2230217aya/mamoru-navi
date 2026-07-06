@@ -103,20 +103,7 @@ def get_user_role():
         return {"status": "success", "user_role": result["user_role"]}
     finally:
         cur.close()
-        conn.close()        
-
-
-
-@router.get("/{user_id}", summary="IDでユーザーを取得する")
-def get_user(user_id: str):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
-            user = cur.fetchone()
-            if not user:
-                raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
-            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
-        
+        conn.close()   
 
 
 
@@ -187,4 +174,20 @@ def update_user_profile(profile: UserProfileUpdate):
         raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
     finally:
         cur.close()
-        conn.close()
+        conn.close()             
+
+
+
+@router.get("/{user_id}", summary="IDでユーザーを取得する")
+def get_user(user_id: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
+            user = cur.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
+            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
+        
+
+
+

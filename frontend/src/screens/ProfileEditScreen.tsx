@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Constants from "expo-constants";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api"; // ★ APIのベースURLを取得するユーティリティ関数をインポート
 
 const dummyUserData = {
   name: "佐藤 健太",
@@ -45,18 +46,12 @@ export default function ProfileEditScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const debuggerHost = Constants.expoConfig?.hostUri;
-        const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-        const baseUrl =
-          process.env.EXPO_PUBLIC_API_URL ||
-          // 1. まず localIp が localhost ならそのまま localhost を使う
-          // 2. もしあなたが adb reverse を実行済みなら、スマホ内の localhost:8000 が PC に直結している
-          // 3. 他の人がモバイルスポット(192.x.x.x)を使っているなら、localIp は自動的にそのIPになる
-          (localIp === "localhost" || localIp === "127.0.0.1"
-            ? `http://localhost:8000`
-            : `http://${localIp}:8000`);
+        const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
 
-        const response = await fetch(`${baseUrl}/user/profile`);
+        const response = await fetch(`${baseUrl}/users/profile`, {
+          method: "GET",
+          headers: API_HEADERS,
+        });
         const data = await response.json();
 
         if (data.status === "success") {
@@ -100,18 +95,9 @@ export default function ProfileEditScreen() {
   // ★ 2. 送信ボタン（保存）が押された時の処理 ★
   const handleSubmit = async () => {
     try {
-      const debuggerHost = Constants.expoConfig?.hostUri;
-      const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-      const baseUrl =
-        process.env.EXPO_PUBLIC_API_URL ||
-        // 1. まず localIp が localhost ならそのまま localhost を使う
-        // 2. もしあなたが adb reverse を実行済みなら、スマホ内の localhost:8000 が PC に直結している
-        // 3. 他の人がモバイルスポット(192.x.x.x)を使っているなら、localIp は自動的にそのIPになる
-        (localIp === "localhost" || localIp === "127.0.0.1"
-          ? `http://localhost:8000`
-          : `http://${localIp}:8000`);
+      const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
 
-      const response = await fetch(`${baseUrl}/user/profile`, {
+      const response = await fetch(`${baseUrl}/users/profile`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
