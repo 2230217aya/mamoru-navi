@@ -27,12 +27,22 @@ type OfficeService = {
   number: string;
 };
 
+type Shelter = {
+  shelter_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
+};
+
 type Props = {
   mode: string;
   officeServices: OfficeService[];
   loading: boolean;
   lastUpdate: string;
   onRefresh: () => void;
+  selectedShelter: Shelter | null;
 };
 
 const MODES = {
@@ -46,6 +56,7 @@ export default function HomeBottomSheet({
   loading,
   lastUpdate,
   onRefresh,
+  selectedShelter
 }: Props) {
 
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -123,7 +134,10 @@ export default function HomeBottomSheet({
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <DisasterModeContent expanded={true} />
+              <DisasterModeContent 
+                expanded={true} 
+                selectedShelter={selectedShelter}
+              />
             </BottomSheetScrollView>
           )}
 
