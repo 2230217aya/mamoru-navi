@@ -309,3 +309,20 @@ docker-compose up -d --build
 9.  動作確認コマンド:
     # 経路計算ができるか確認 (返却行数が 0 でなければOK)
     docker exec -it mamoru-navi-db-1 psql -U user -d mamoru_navi_db -c "SELECT seq, node, edge, cost FROM pgr_dijkstra('SELECT gid as id, source, target, length as cost FROM ways', (SELECT source FROM ways LIMIT 1), (SELECT target FROM ways ORDER BY gid DESC LIMIT 1), directed := false) LIMIT 10;"
+
+## 外部APIの利用 (Google Maps API)
+
+本プロジェクトでは、災害モード時の高精度なルート案内を実現するためにGoogle Maps Platformを利用しています。
+
+### 利用サービス
+
+- **Directions API**: 現在地から避難所までの最適な歩行ルート（座標列）を取得するために使用。
+- **Polyline Algorithm**: サーバーから返却される圧縮されたルートデータをデコードし、地図上に描画。
+
+### 環境構築
+
+フロントエンドのルートディレクトリにある `.env` ファイルに以下のキーを設定してください。
+
+```txt
+EXPO_PUBLIC_GOOGLE_API_KEY=あなたのGoogle_API_キー
+```

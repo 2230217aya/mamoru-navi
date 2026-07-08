@@ -1,35 +1,39 @@
 # バックエンドAPI仕様書
 
 ## 概要
+
 このドキュメントでは、まもるナビで使用するバックエンドAPIの仕様をまとめる。
 
 バックエンドでは、主に以下の機能を提供する。
 
-* バックエンドの疎通確認
-* ユーザーの現在地登録
-* ユーザーの最新位置情報取得
-* 避難所情報取得
-* 避難所エリア判定
-* 避難所ごとの人数集計
-* 混雑度取得
-* ヒートマップ用データ取得
-* オフライン地図用データ取得
-* 古い位置情報の削除
+- バックエンドの疎通確認
+- ユーザーの現在地登録
+- ユーザーの最新位置情報取得
+- 避難所情報取得
+- 避難所エリア判定
+- 避難所ごとの人数集計
+- 混雑度取得
+- ヒートマップ用データ取得
+- オフライン地図用データ取得
+- 古い位置情報の削除
 
 ---
 
 ## 1. 現在地登録API
 
 ### エンドポイント
+
 ```txt
 POST /locations/
 ```
 
 ### 概要
+
 ユーザーの現在地情報を登録する。
 ユーザーID、緯度、経度を受け取り、`user_locations` テーブルに保存する。
 
 ### リクエスト例
+
 ```json
 {
   "user_id": "11111111-1111-1111-1111-111111111111",
@@ -39,6 +43,7 @@ POST /locations/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "位置情報を受け取りました",
@@ -55,20 +60,24 @@ POST /locations/
 ## 2. 最新現在地取得API
 
 ### エンドポイント
+
 ```txt
 GET /locations/{user_id}/latest
 ```
 
 ### 概要
+
 指定したユーザーの最新の位置情報を取得する。
 同じユーザーが複数回位置情報を送信している場合でも、最新の1件のみを返す。
 
 ### パスパラメータ
-| パラメータ   | 型      | 説明     |
-| ------- | ------ | ------ |
-| user_id | string | ユーザーID |
+
+| パラメータ | 型     | 説明       |
+| ---------- | ------ | ---------- |
+| user_id    | string | ユーザーID |
 
 ### レスポンス例
+
 ```json
 {
   "id": "026ef28b-1388-4a05-be97-4c9d0fdd9042",
@@ -84,15 +93,18 @@ GET /locations/{user_id}/latest
 ## 3. 避難所一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /shelters
 ```
 
 ### 概要
+
 登録されている避難所一覧を取得する。
 避難所ID、避難所名、住所、緯度、経度、収容人数を返す。
 
 ### レスポンス例
+
 ```json
 {
   "shelters": [
@@ -113,20 +125,24 @@ GET /shelters
 ## 4. 避難所エリア判定API
 
 ### エンドポイント
+
 ```txt
 GET /locations/{user_id}/area
 ```
 
 ### 概要
+
 指定したユーザーの現在地が、避難所エリア内にいるかどうかを判定する。
 避難所との距離を計算し、500m以内であれば `in_area` を `true` として返す。
 
 ### パスパラメータ
-| パラメータ   | 型      | 説明     |
-| ------- | ------ | ------ |
-| user_id | string | ユーザーID |
+
+| パラメータ | 型     | 説明       |
+| ---------- | ------ | ---------- |
+| user_id    | string | ユーザーID |
 
 ### レスポンス例
+
 ```json
 {
   "user_id": "11111111-1111-1111-1111-111111111111",
@@ -143,16 +159,19 @@ GET /locations/{user_id}/area
 ## 5. 避難所ごとの人数集計API
 
 ### エンドポイント
+
 ```txt
 GET /shelters/crowd-counts
 ```
 
 ### 概要
+
 避難所ごとに、避難所エリア内にいるユーザー数を集計する。
 混雑判定では、最終更新から5分以内の位置情報のみを対象とする。
 同一ユーザーの位置情報が複数存在する場合は、最新の位置情報のみを使用する。
 
 ### レスポンス例
+
 ```json
 {
   "crowd_counts": [
@@ -173,15 +192,18 @@ GET /shelters/crowd-counts
 ## 6. ヒートマップ用データ取得API
 
 ### エンドポイント
+
 ```txt
 GET /shelters/heatmap
 ```
 
 ### 概要
+
 フロントエンドでヒートマップ表示に使用するデータを取得する。
 避難所の緯度・経度、現在人数、混雑率、混雑度をまとめて返す。
 
 ### レスポンス例
+
 ```json
 {
   "heatmap_data": [
@@ -204,15 +226,18 @@ GET /shelters/heatmap
 ## 7. オフライン地図用データ取得API
 
 ### エンドポイント
+
 ```txt
 GET /offline/map-data
 ```
 
 ### 概要
+
 オフライン時に使用する避難所データを取得する。
 通信可能なタイミングでフロントエンド側がこのAPIから避難所情報を取得し、端末に保存することで、オフライン時でも避難所一覧や地図上のピン表示に利用できる。
 
 ### レスポンス例
+
 ```json
 {
   "shelters": [
@@ -234,11 +259,13 @@ GET /offline/map-data
 ## 8. 古い位置情報削除API
 
 ### エンドポイント
+
 ```txt
 DELETE /locations/old
 ```
 
 ### 概要
+
 最終更新から一定時間以上経過した古い位置情報を削除する。
 現在の仕様では、最終更新から5分以上経過した位置情報を古い情報として扱う。
 
@@ -257,14 +284,17 @@ DELETE /locations/old
 ## 9. ヘルスチェックAPI
 
 ### エンドポイント
+
 ```txt
 GET /health
 ```
 
 ### 概要
+
 バックエンドが正常に起動しているかを確認するためのAPI。
 
 ### レスポンス例
+
 ```json
 {
   "status": "ok",
@@ -273,6 +303,7 @@ GET /health
 ```
 
 ### 使用用途
+
 Docker起動後のバックエンド疎通確認
 フロントエンドとの結合時のAPI接続確認
 
@@ -291,16 +322,16 @@ Docker起動後のバックエンド疎通確認
 
 混雑度は、現在人数と収容人数から算出した混雑率をもとに判定する。
 
-| 混雑率       | 表示   |
-| --------- | ---- |
+| 混雑率     | 表示     |
+| ---------- | -------- |
 | 0% 〜 49%  | 空きあり |
 | 50% 〜 79% | やや混雑 |
-| 80% 〜 99% | 混雑   |
-| 100%以上    | 満員   |
+| 80% 〜 99% | 混雑     |
+| 100%以上   | 満員     |
 
-| 条件 | crowd_rate | crowd_level |
-| --- | --- | --- |
-| capacity が 0 または未設定 | null | unknown |
+| 条件                       | crowd_rate | crowd_level |
+| -------------------------- | ---------- | ----------- |
+| capacity が 0 または未設定 | null       | unknown     |
 
 ---
 
@@ -309,19 +340,21 @@ Docker起動後のバックエンド疎通確認
 - `crowd_unit_policy.md`：混雑判定の単位に関する仕様
 - `crowd_level_policy.md`：混雑度の判定基準に関する仕様
 
-
 ## 10. チェックイン作成API
 
 ### エンドポイント
+
 ```txt
 POST /checkins/
 ```
 
 ### 概要
+
 ユーザーが避難所にチェックインした記録を作成する。
 チェックイン方法（QRコード、手動入力など）と備考を保存する。
 
 ### リクエスト例
+
 ```json
 {
   "user_id": "123e4567-e89b-12d3-a456-426614174000",
@@ -332,6 +365,7 @@ POST /checkins/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "checkin created",
@@ -344,15 +378,18 @@ POST /checkins/
 ## 11. ユーザー別チェックイン履歴取得API
 
 ### エンドポイント
+
 ```txt
 GET /checkins/user/{user_id}
 ```
 
 ### 概要
+
 指定したユーザーのすべてのチェックイン履歴を取得する。
 チェックイン・チェックアウト時刻、同期状況、備考を含む。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -373,15 +410,18 @@ GET /checkins/user/{user_id}
 ## 12. 避難所別チェックイン一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /checkins/shelter/{shelter_id}
 ```
 
 ### 概要
+
 指定した避難所におけるすべてのチェックイン記録を取得する。
 避難所側の管理画面で在所者一覧を確認する用途に使用する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -401,15 +441,18 @@ GET /checkins/shelter/{shelter_id}
 ## 13. チェックアウトAPI
 
 ### エンドポイント
+
 ```txt
 PATCH /checkins/{checkin_id}/checkout
 ```
 
 ### 概要
+
 チェックイン中のユーザーを避難所からチェックアウトさせる。
 既にチェックアウト済みの場合はエラーを返す。
 
 ### レスポンス例
+
 ```json
 {
   "message": "checkout completed",
@@ -422,15 +465,18 @@ PATCH /checkins/{checkin_id}/checkout
 ## 14. 同期状況更新API
 
 ### エンドポイント
+
 ```txt
 PATCH /checkins/{checkin_id}/sync
 ```
 
 ### 概要
+
 オフライン環境で記録されたチェックインデータの同期状況を更新する。
 サーバーとの同期が完了した際に使用する。
 
 ### レスポンス例
+
 ```json
 {
   "message": "sync status updated",
@@ -443,15 +489,18 @@ PATCH /checkins/{checkin_id}/sync
 ## 15. 混雑スナップショット記録API
 
 ### エンドポイント
+
 ```txt
 POST /congestion/
 ```
 
 ### 概要
+
 避難所の混雑状況（空き・普通・満杯）を記録する。
 データソースは手動入力・推定・センサーのいずれかを指定する。
 
 ### リクエスト例
+
 ```json
 {
   "shelter_id": "ebc1b1f7-b871-48d1-b551-69dba90129a5",
@@ -463,6 +512,7 @@ POST /congestion/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "snapshot created",
@@ -475,15 +525,18 @@ POST /congestion/
 ## 16. 全避難所の最新混雑状況取得API
 
 ### エンドポイント
+
 ```txt
 GET /congestion/
 ```
 
 ### 概要
+
 全避難所それぞれの最新の混雑スナップショットを取得する。
 ヒートマップやダッシュボード表示の基礎データとして使用する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -503,15 +556,18 @@ GET /congestion/
 ## 17. 避難所別最新混雑状況取得API
 
 ### エンドポイント
+
 ```txt
 GET /congestion/{shelter_id}/latest
 ```
 
 ### 概要
+
 指定した避難所の直近の混雑スナップショットを1件取得する。
 避難所詳細画面のリアルタイム表示に使用する。
 
 ### レスポンス例
+
 ```json
 {
   "snapshot_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
@@ -529,15 +585,18 @@ GET /congestion/{shelter_id}/latest
 ## 18. 避難所混雑履歴取得API
 
 ### エンドポイント
+
 ```txt
 GET /congestion/{shelter_id}
 ```
 
 ### 概要
+
 指定した避難所の混雑スナップショットを時系列で取得する。
 混雑の推移グラフ表示などに使用する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -556,15 +615,18 @@ GET /congestion/{shelter_id}
 ## 19. 危険エリア作成API
 
 ### エンドポイント
+
 ```txt
 POST /danger-areas/
 ```
 
 ### 概要
+
 火災・浸水・倒壊などの危険エリアをジオメトリ情報とともに登録する。
 リスクレベルや発生トリガー条件も保存する。
 
 ### リクエスト例
+
 ```json
 {
   "risk_type": "flood",
@@ -579,6 +641,7 @@ POST /danger-areas/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "danger area created",
@@ -591,15 +654,18 @@ POST /danger-areas/
 ## 20. 危険エリア一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /danger-areas/
 ```
 
 ### 概要
+
 登録されているすべての危険エリアを取得する。
 `is_active` パラメータで有効なエリアのみに絞り込み可能。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -623,15 +689,18 @@ GET /danger-areas/
 ## 21. 危険エリア詳細取得API
 
 ### エンドポイント
+
 ```txt
 GET /danger-areas/{area_id}
 ```
 
 ### 概要
+
 指定したIDの危険エリア詳細情報を取得する。
 ジオメトリはGeoJSON形式で返される。
 
 ### レスポンス例
+
 ```json
 {
   "area_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
@@ -653,15 +722,18 @@ GET /danger-areas/{area_id}
 ## 22. 危険エリア更新API
 
 ### エンドポイント
+
 ```txt
 PATCH /danger-areas/{area_id}
 ```
 
 ### 概要
+
 危険エリアの情報を部分更新する。
 リスクレベルやジオメトリ、有効/無効状態などを変更可能。
 
 ### レスポンス例
+
 ```json
 {
   "message": "danger area updated",
@@ -674,15 +746,18 @@ PATCH /danger-areas/{area_id}
 ## 23. 危険エリア削除API
 
 ### エンドポイント
+
 ```txt
 DELETE /danger-areas/{area_id}
 ```
 
 ### 概要
+
 指定した危険エリアを削除する。
 危険が解消された場合などに使用する。
 
 ### レスポンス例
+
 ```json
 {
   "message": "danger area deleted",
@@ -695,15 +770,18 @@ DELETE /danger-areas/{area_id}
 ## 24. 通知送信API
 
 ### エンドポイント
+
 ```txt
 POST /notifications/
 ```
 
 ### 概要
+
 ユーザーに緊急・警告・情報・通常の通知を送信する。
 優先度（1〜3）と、関連する危険エリアIDを指定できる。
 
 ### リクエスト例
+
 ```json
 {
   "user_id": "123e4567-e89b-12d3-a456-426614174000",
@@ -717,6 +795,7 @@ POST /notifications/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "notification created",
@@ -729,14 +808,17 @@ POST /notifications/
 ## 25. ユーザー通知一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /notifications/user/{user_id}
 ```
 
 ### 概要
+
 指定したユーザーが受信したすべての通知を、送信日時の降順で取得する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -758,15 +840,18 @@ GET /notifications/user/{user_id}
 ## 26. 未読通知取得API
 
 ### エンドポイント
+
 ```txt
 GET /notifications/user/{user_id}/unread
 ```
 
 ### 概要
+
 指定したユーザーの未読通知のみを、優先度・送信日時の降順で取得する。
 未読件数も合わせて返す。
 
 ### レスポンス例
+
 ```json
 {
   "unread_count": 1,
@@ -789,15 +874,18 @@ GET /notifications/user/{user_id}/unread
 ## 27. 通知既読化API
 
 ### エンドポイント
+
 ```txt
 PATCH /notifications/{notification_id}/read
 ```
 
 ### 概要
+
 指定した通知を既読状態にする。
 既に既読の場合はその旨を返す。
 
 ### レスポンス例
+
 ```json
 {
   "message": "通知が既読にマークされました",
@@ -810,15 +898,18 @@ PATCH /notifications/{notification_id}/read
 ## 28. 全通知既読化API
 
 ### エンドポイント
+
 ```txt
 PATCH /notifications/user/{user_id}/read-all
 ```
 
 ### 概要
+
 指定したユーザーの未読通知をすべて既読にする。
 未読通知が存在しない場合はエラーを返す。
 
 ### レスポンス例
+
 ```json
 {
   "message": "3 通知が既読にマークされました"
@@ -830,15 +921,18 @@ PATCH /notifications/user/{user_id}/read-all
 ## 29. 施設予約作成API
 
 ### エンドポイント
+
 ```txt
 POST /reservations/
 ```
 
 ### 概要
+
 避難所内の施設（会議室、シャワー等）の予約を作成する。
 開始時刻が終了時刻より前であることを検証する。
 
 ### リクエスト例
+
 ```json
 {
   "facility_id": "e5f6a7b8-c9d0-1234-efab-345678901234",
@@ -850,6 +944,7 @@ POST /reservations/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "reservation created",
@@ -862,14 +957,17 @@ POST /reservations/
 ## 30. ユーザー別予約一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /reservations/user/{user_id}
 ```
 
 ### 概要
+
 指定したユーザーが行ったすべての施設予約を取得する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -889,15 +987,18 @@ GET /reservations/user/{user_id}
 ## 31. 施設別予約一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /reservations/facility/{facility_id}
 ```
 
 ### 概要
+
 指定した施設に対するすべての予約を取得する。
 施設管理者が予約状況を確認する用途に使用する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -916,14 +1017,17 @@ GET /reservations/facility/{facility_id}
 ## 32. 予約状況更新API
 
 ### エンドポイント
+
 ```txt
 PATCH /reservations/{reservation_id}/status
 ```
 
 ### 概要
+
 予約のステータス（pending, confirmed, canceled, completed）を更新する。
 
 ### リクエスト例
+
 ```json
 {
   "status": "confirmed"
@@ -931,6 +1035,7 @@ PATCH /reservations/{reservation_id}/status
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "status updated",
@@ -944,15 +1049,18 @@ PATCH /reservations/{reservation_id}/status
 ## 33. 予約キャンセルAPI
 
 ### エンドポイント
+
 ```txt
 DELETE /reservations/{reservation_id}
 ```
 
 ### 概要
+
 予約をキャンセルする。
 完了済み（completed）の予約はキャンセルできない。
 
 ### レスポンス例
+
 ```json
 {
   "message": "reservation canceled",
@@ -965,14 +1073,17 @@ DELETE /reservations/{reservation_id}
 ## 34. 施設作成API
 
 ### エンドポイント
+
 ```txt
 POST /facilities/
 ```
 
 ### 概要
+
 避難所内に設置されている施設（会議室、シャワー等）を登録する。
 
 ### リクエスト例
+
 ```json
 {
   "name": "多目的室A",
@@ -982,6 +1093,7 @@ POST /facilities/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "facility created",
@@ -994,15 +1106,18 @@ POST /facilities/
 ## 35. 施設一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /facilities/
 ```
 
 ### 概要
+
 登録されている全施設を取得する。
 `type` パラメータで施設タイプによる絞り込みが可能。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -1019,14 +1134,17 @@ GET /facilities/
 ## 36. 施設詳細取得API
 
 ### エンドポイント
+
 ```txt
 GET /facilities/{facility_id}
 ```
 
 ### 概要
+
 指定したIDの施設の詳細情報を取得する。
 
 ### レスポンス例
+
 ```json
 {
   "facility_id": "e5f6a7b8-c9d0-1234-efab-345678901234",
@@ -1041,16 +1159,19 @@ GET /facilities/{facility_id}
 ## 37. ユーザー作成API
 
 ### エンドポイント
+
 ```txt
 POST /users/
 ```
 
 ### 概要
+
 新規ユーザーを登録する。
 自宅位置（緯度・経度）はPostGISのPOINT型として保存される。
 メールアドレスまたは電話番号が既に登録済みの場合はエラーを返す。
 
 ### リクエスト例
+
 ```json
 {
   "name": "山田太郎",
@@ -1068,6 +1189,7 @@ POST /users/
 ```
 
 ### レスポンス例
+
 ```json
 {
   "message": "user created",
@@ -1080,14 +1202,17 @@ POST /users/
 ## 38. ユーザー一覧取得API
 
 ### エンドポイント
+
 ```txt
 GET /users/
 ```
 
 ### 概要
+
 登録されている全ユーザーの一覧（ID・名前・メールアドレス）を取得する。
 
 ### レスポンス例
+
 ```json
 [
   {
@@ -1103,15 +1228,18 @@ GET /users/
 ## 39. ユーザーQRコード取得API
 
 ### エンドポイント
+
 ```txt
 GET /users/qr-code
 ```
 
 ### 概要
+
 ユーザーIDを埋め込んだQRコードコンテンツを生成する。
 フロントエンドはこの文字列を使ってQRコード画像を生成する。
 
 ### レスポンス例
+
 ```json
 {
   "qr_code_content": "mamoru_navi_user:123e4567-e89b-12d3-a456-426614174000",
@@ -1124,14 +1252,17 @@ GET /users/qr-code
 ## 40. ユーザー詳細取得API
 
 ### エンドポイント
+
 ```txt
 GET /users/{user_id}
 ```
 
 ### 概要
+
 指定したIDのユーザー詳細情報（年齢・血液型・既往症等を含む）を取得する。
 
 ### レスポンス例
+
 ```json
 {
   "user_id": "123e4567-e89b-12d3-a456-426614174000",
@@ -1143,6 +1274,149 @@ GET /users/{user_id}
   "medical_conditions": "なし",
   "phone_number": "090-1234-5678",
   "address": "大阪市中央区..."
+}
+```
+
+---
+
+## 41. 避難計画取得API
+
+### エンドポイント
+
+```txt
+GET /map/my-plan/{user_id}
+```
+
+### 概要
+
+特定のユーザーに割り当てられた避難計画（ルートデータ）を取得する。
+
+### レスポンス例
+
+```json
+{
+  "status": "success",
+  "plan": {
+    "plan_id": "plan_001",
+    "user_id": "11111111-1111-1111-1111-111111111111",
+    "route_data": {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [135.5023, 34.6937],
+          [135.5022, 34.6938]
+        ]
+      }
+    }
+  }
+}
+```
+
+---
+
+## 42. 避難受付・同期API
+
+### エンドポイント
+
+```txt
+POST /scan/sync
+```
+
+### 概要
+
+オフライン中に端末（SQLite）に蓄積されたチェックイン（避難受付）データを、オンライン復旧時にサーバーへ一括送信する。サーバー側では、送信された transaction_id（checkin_id）の重複チェックを行い、未登録のデータのみを保存する。
+
+### リクエスト例
+
+```json
+{
+  "checkin_id": "uuid-string",
+  "user_id": "11111111-1111-1111-1111-111111111111",
+  "shelter_id": "uuid-string",
+  "checkin_time": "2026-07-06T15:30:00Z"
+}
+```
+
+### レスポンス例
+
+```json
+{
+  "status": "synchronized",
+  "message": "1件のデータを同期しました"
+}
+```
+
+---
+
+## 43. ユーザー固有・避難計画取得API
+
+### エンドポイント
+
+```txt
+GET /map/my-plan/{user_id}
+```
+
+### 概要
+
+指定したユーザーに最適化された避難計画（避難ルートおよび集合場所）を取得する。
+平常時のオンライン中にこのAPIからデータを取得し、端末にキャッシュすることで、災害時の完全オフライン環境でのナビゲーションを可能にする。
+
+### レスポンス例
+
+```json
+{
+  "status": "success",
+  "plan": {
+    "plan_id": "uuid-string",
+    "user_id": "11111111-1111-1111-1111-111111111111",
+    "primary_shelter_id": "ebc1b1f7-b871-48d1-b551-69dba90129a5",
+    "route_data": {
+      "type": "LineString",
+      "coordinates": [
+        [135.5, 34.7333],
+        [135.501, 34.734],
+        [135.505, 34.736]
+      ]
+    },
+    "meeting_point_name": "テスト避難所",
+    "meeting_point_lat": 34.736,
+    "meeting_point_lon": 135.505,
+    "updated_at": "2026-07-06T12:00:00Z"
+  }
+}
+```
+
+---
+
+## 44. 道路グラフデータ(オフライン用)取得API
+
+### エンドポイント
+
+```txt
+GET /offline/routing-graph
+```
+
+### 概要
+
+指定したエリア周辺の道路ネットワークデータ（ノードおよびエッジ）を取得する。
+※pgRoutingベースの高度なルート計算が必要な場合に、端末側へ事前にグラフデータを配信する目的で使用する。
+
+### レスポンス例
+
+```json
+{
+  "status": "success",
+  "nodes": [{ "id": "node_A", "lat": 34.7333, "lon": 135.5 }],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_A",
+      "target": "node_B",
+      "distance": 200.0,
+      "geometry": "..."
+    }
+  ]
 }
 ```
 
