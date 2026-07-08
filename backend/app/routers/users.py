@@ -1,6 +1,6 @@
 # backend/app/routers/users.py
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uuid
@@ -38,7 +38,6 @@ class QRCodeDataResponse(BaseModel):
     """
     qr_code_content: str
     message: str = "QRコードのコンテンツを生成しました。"
-
 
 # プロフィール更新で受け取るデータの型定義
 class UserProfileUpdate(BaseModel):

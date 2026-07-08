@@ -1,3 +1,5 @@
+// frontend\src\components\home\HomeBottomSheet.tsx
+
 // ===== React =====
 import React, { useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
@@ -21,7 +23,6 @@ type OfficeService = {
   number: string;
 };
 
-// 修正後
 type Shelter = {
   shelter_id: string;
   name: string;
@@ -29,8 +30,8 @@ type Shelter = {
   latitude: number;
   longitude: number;
   capacity: number;
-  toilet_count?: number;
-  supplies?: string[];
+  toilet_count?: number; // あなたが追加したフィールド
+  supplies?: string[]; // あなたが追加したフィールド
 };
 
 type Props = {
@@ -123,7 +124,6 @@ export default function HomeBottomSheet({
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* DisasterModeContentにもデータを渡すと、詳細画面も連動できます */}
               <DisasterModeContent
                 expanded={true}
                 selectedShelter={selectedShelter}
@@ -162,6 +162,7 @@ export default function HomeBottomSheet({
     </>
   );
 }
+
 // ===== Style =====
 const styles = StyleSheet.create({
   container: {
@@ -238,7 +239,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
   },
-  // ===== 予約ボタン =====
   reserveButton: {
     backgroundColor: "#FFEE37",
     paddingHorizontal: 30,

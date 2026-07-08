@@ -992,6 +992,7 @@ export default function UserHome() {
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
+            selectedShelter={selectedShelter}
           />
         )}
 
