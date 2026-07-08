@@ -1,16 +1,26 @@
 import { StyleSheet, Pressable, View, Text, Image, ScrollView } from "react-native";
-import { Stack, router  } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import UserLists from '../components/userList-component';
 
-// apiのurl
-const API_BASE_URL = "";
-// 使用するapiのurl
-// /の後に避難所と人のやつ付け足す
-const SHELTER_API_URL = `${API_BASE_URL}/`;
-const USERS_API_URL = `${API_BASE_URL}/`;
+// テスト用のID
+const TEST_SHELTER_ID = "123e4567-e89b-12d3-a456-426614174000";
 
-export default function userList() {
+// apiのurl
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// 避難所のIDを受け取り
+type Props = { SHELTER_ID_GET: string; };
+
+// SHELTER_IDを受け取る
+export default function userList({ SHELTER_ID_GET }: Props) {
+  // 避難所IDがない場合テストデータを入れる
+  const SHELTER_ID = SHELTER_ID_GET ?? TEST_SHELTER_ID;
+
+  // 使用するapiのurl
+  const SHELTER_API_URL = `${API_BASE_URL}/shelters/${SHELTER_ID}`;
+  const USERS_API_URL = `${API_BASE_URL}/checkins/shelter/${SHELTER_ID}`;
+
   // 避難所データの受け取り皿（中身は入力が無かったときの値）
   const [shelterData, setShelterData] = useState({
       evacuationShelter: '',
@@ -22,9 +32,9 @@ export default function userList() {
   // .testの部分をバックの型名に変更
   const convertShelterData = (ShelterData: any) => {
     return {
-      evacuationShelter: ShelterData.test,
-      maxPeople: ShelterData.test,
-      nowPeople: ShelterData.test,
+      evacuationShelter: ShelterData.name,
+      maxPeople: ShelterData.capacity,
+      nowPeople: "Error", // 現在人数を取得できない時にエラーを出す
     };
   };
 
@@ -32,90 +42,82 @@ export default function userList() {
   type User = {
     name: string;
     gender: string;
-    age: number;
+    age: string
     blood: string;
     tel: string;
   };
   // ユーザー一覧の受け取り皿（中身は入力が無かったときの値）
   const [users, setUsers] = useState<User[]>([]);
 
-  // バックから送られた避難所データの内データの名前がuseStateと違っていたら入力し直す
-  // .testの部分をバックの型名に変更
-  const convertUsersData = (userData: any) => {
-    return userData.map((user: any) => ({
-      name: user.test,
-      gender: user.test,
-      age: user.test,
-      blood: user.test,
-      tel: user.test,
-    }));
+  // 送られてきた生年月日から年齢を計算する
+  const calcAge = (birthday: string) => {
+    const birth = new Date(birthday);
+    const today = new Date();
+
+    let age = today.getFullYear() - birth.getFullYear();
+
+    // 今年まだ誕生日が来ていなければ1歳引く
+    const hasBirthdayPassed =
+      today.getMonth() > birth.getMonth() ||
+      (today.getMonth() === birth.getMonth() &&
+        today.getDate() >= birth.getDate());
+
+    if (!hasBirthdayPassed) {
+      age--;
+    }
+
+    return age.toString();
   };
 
   // 画面表示時に実行
   useEffect(() => {
     // 避難所データ
     const fetchSData = async () => {
-      // 避難所などの情報取得（テスト用）
-      const testShelterData = {
-        evacuationShelter: "〇〇避難所",
-        maxPeople: "50",
-        nowPeople: "15",
-      };
+      // 避難所などの情報取得
+      const response = await fetch(SHELTER_API_URL);
+      if (!response.ok) {throw new Error("shelter fetch failed");}
+      let ShelterData = await response.json();
 
-      setShelterData(testShelterData);
+      console.log(ShelterData);   // 確認用
 
+      // バックから送られたデータの名前がuseStateと違っていたら名前変換
+      ShelterData = convertShelterData(ShelterData);
 
-      // // 避難所などの情報取得
-      // const response = await fetch(SHELTER_API_URL);
-      // let ShelterData = await response.json();
-
-      // // バックから送られたデータの名前がuseStateと違っていたら名前変換
-      // ShelterData = convertShelterData(ShelterData);
-
-      // setShelterData(ShelterData);
+      setShelterData(ShelterData);
     };
 
     // 避難所の中の人データ
     const fetchUData = async () => {
-      // 避難所内の情報取得（テスト用）
-      const testUsers = [
-        { name: "田中", gender: "M", age: 20, blood: "A", tel: "0120-123-456", },
-        { name: "佐藤", gender: "F", age: 22, blood: "O", tel: "080-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-        { name: "test", gender: "T", age: 0, blood: "T", tel: "000-0000-0000", },
-      ];
+      // 避難所にチェックインしている人を取得
+      const checkinResponse = await fetch(USERS_API_URL);
+      if (!checkinResponse.ok) {throw new Error("checkin fetch failed");}
+      const checkins = await checkinResponse.json();
 
-      setUsers(testUsers);
+      // 現在の人数を取得
+      setShelterData(prev => ({
+        ...prev,
+        nowPeople: String(checkins.length),
+      }));
 
+      // 全ユーザー情報を取得
+      const userList = await Promise.all(
+        checkins.map(async (checkin: any) => {
+          const response = await fetch(
+            `${API_BASE_URL}/users/${checkin.user_id}`
+          );
+          const user = await response.json();
 
-      // 避難所内の情報取得
-      // const response = await fetch(USERS_API_URL);
-      // const userData = await response.json();
-      // setUsers(userData);
+          return {
+            name: user.name,
+            gender: user.gender,
+            age: calcAge(user.birthday),
+            blood: user.blood_type,
+            tel: user.phone_number,
+          };
+        })
+      );
+      console.log("userList =", userList);
+      setUsers(userList);
     };
   
     fetchSData();
@@ -201,7 +203,7 @@ const styles = StyleSheet.create({
   // QRアイコン
   qrcodeImageButton: {
     position: 'absolute',
-    top: 50,
+    top: 40,
     left: 10,
     zIndex: 10,
   },
@@ -212,14 +214,14 @@ const styles = StyleSheet.create({
   },
   // 避難所名
   shelter: {
-    fontSize: 30,
+    fontSize: 20,
     textAlign: 'center',
-    marginTop: 60,
+    // marginTop: 60,
     fontWeight: 'bold',
   },
   // 人数
   peoples: {
-    fontSize: 20,
+    fontSize: 15,
     // position: 'absolute',
     // right: 10,
     // marginTop: 10,
@@ -227,9 +229,10 @@ const styles = StyleSheet.create({
   column: {
     flexDirection: 'column',
   },
+  // 遷移の画像
   cardboardImageButton: {
     position: 'absolute',
-    top: 50,
+    top: 40,
     right: 10,
     zIndex: 10,
   },

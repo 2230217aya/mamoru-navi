@@ -4,7 +4,7 @@ import { Href, useRouter  } from 'expo-router';
 type Props = {
   name: string;
   gender: string;
-  age: number;
+  age: string;
   blood: string;
   tel: string;
 };
