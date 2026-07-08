@@ -193,6 +193,25 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
       longitude: 135.504684,
     },
   ];
+  const fitFacilities = (list: Facility[]) => {
+  if (list.length === 0) return;
+
+  mapRef.current?.fitToCoordinates(
+    list.map((facility) => ({
+      latitude: facility.latitude,
+      longitude: facility.longitude,
+    })),
+    {
+      edgePadding: {
+        top: 80,
+        right: 80,
+        bottom: 80,
+        left: 80,
+      },
+      animated: true,
+    }
+  );
+};
 const fetchFacilities = async (type?: string | null) => {
   try {
     setLoading(true);
@@ -209,23 +228,9 @@ const list = data as Facility[];
 
     setFacilities(data);
 
-    if (data.length > 0) {
+if (mode === MODES.NORMAL) {
   setTimeout(() => {
-    mapRef.current?.fitToCoordinates(
-      list.map((facility) => ({
-  latitude: facility.latitude,
-  longitude: facility.longitude,
-})),
-      {
-        edgePadding: {
-          top: 80,
-          right: 80,
-          bottom: 80,
-          left: 80,
-        },
-        animated: true,
-      }
-    );
+    fitFacilities(list);
   }, 300);
 }
   } catch (e) {
@@ -287,6 +292,7 @@ const list = data as Facility[];
         <MapView
           ref={mapRef}
           style={styles.map}
+          googleRenderer="LEGACY"
           initialRegion={{
           latitude: 34.6937,
           longitude: 135.5023,
@@ -300,22 +306,35 @@ const list = data as Facility[];
             // ===== 平常モード施設マーカー =====
             <>
             {facilities.map((facility) => (
-             <Marker
-              key={facility.facility_id}
-              coordinate={{
-                latitude: facility.latitude,
-                longitude: facility.longitude,
-              }}
-              title={facility.name}
-              description={facility.type}
-              onPress={() => {
-                console.log("marker clicked");
+              <Marker
+                key={facility.facility_id}
+                coordinate={{
+                  latitude: facility.latitude,
+                  longitude: facility.longitude,
+                }}
+                image={
+                  facility.type === "city_hall"
+                    ? require("../../assets/images/markers/cityhall.png")
+                    : facility.type === "library"
+                    ? require("../../assets/images/markers/library.png")
+                    : require("../../assets/images/markers/gym.png")
+                }
+                onPress={() => {
+                  setSelectedFacility(facility);
+                  fetchOfficeServices(facility.facility_id);
+                  setShowBottomSheet(true);
 
-                setSelectedFacility(facility);
-                fetchOfficeServices(facility.facility_id);
-                setShowBottomSheet(true);
-              }}
-            />
+                  mapRef.current?.animateToRegion(
+                    {
+                      latitude: facility.latitude,
+                      longitude: facility.longitude,
+                      latitudeDelta: 0.003,
+                      longitudeDelta: 0.003,
+                    },
+                    500
+                  );
+                }}
+              />
             ))}
           </>
 
@@ -535,7 +554,13 @@ const list = data as Facility[];
         onRefresh={fetchOfficeServices}
         selectedFacility={selectedFacility}
         visible={showBottomSheet}
-        onClose={() => setShowBottomSheet(false)}
+        onClose={() => {
+          setShowBottomSheet(false);
+
+          if (mode === MODES.NORMAL) {
+            fitFacilities(facilities);
+          }
+        }}
       />
         )}
 
