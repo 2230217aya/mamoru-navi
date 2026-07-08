@@ -1,13 +1,10 @@
-// ===== React =====
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-// ===== BottomSheet =====
 import BottomSheet, {
   BottomSheetView,
   BottomSheetScrollView,
 } from '@gorhom/bottom-sheet';
 
-// ===== React Native =====
 import {
   Image,
   StyleSheet,
@@ -16,20 +13,17 @@ import {
   TouchableOpacity,
 } from 'react-native';
 
-// ===== Components =====
 import NormalModeContent from './NormalModeContent';
 import DisasterModeContent from './DisasterModeContent';
 
-// ===== Types =====
 type Facility = {
   facility_id: string;
   name: string;
   type: string;
   latitude: number;
   longitude: number;
-  business_hours?: string;
-  closed_days?: string;
 };
+
 type OfficeService = {
   id: number;
   title: string;
@@ -43,12 +37,8 @@ type Props = {
   lastUpdate: string;
   onRefresh: (facilityId: string) => void;
   selectedFacility: Facility | null;
-  
-};
-
-const MODES = {
-  NORMAL: 'normal',
-  DISASTER: 'disaster',
+  visible: boolean;   // ⭐ 新增控制開關
+  onClose: () => void; // ⭐ 關閉用
 };
 
 export default function HomeBottomSheet({
@@ -58,215 +48,103 @@ export default function HomeBottomSheet({
   lastUpdate,
   onRefresh,
   selectedFacility,
+  visible,
+  onClose,
 }: Props) {
-useEffect(() => {
-  if (!selectedFacility?.facility_id) return;
-
-  onRefresh(selectedFacility.facility_id);
-}, [selectedFacility]);
-
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const [sheetIndex, setSheetIndex] = useState(0);
 
   const snapPoints = useMemo(() => {
-    if (mode === MODES.NORMAL) {
-      return ['16%', '47%'];
-    }
-    return ['33%', '88%'];
+    return mode === 'normal' ? ['16%', '47%'] : ['33%', '88%'];
   }, [mode]);
 
+  const sheetRef = useRef<BottomSheet>(null);
+
+  const index = visible ? 1 : -1; // ⭐ 關鍵：控制開關
+
+  useEffect(() => {
+    if (!selectedFacility?.facility_id) return;
+    onRefresh(selectedFacility.facility_id);
+  }, [selectedFacility]);
+
   return (
-    <>
-      {/* ===== BottomSheet ===== */}
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={1}
-        onChange={setSheetIndex}
-        snapPoints={snapPoints}
-        enableDynamicSizing={false}
-        backgroundStyle={{
-          backgroundColor: '#fff',
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-        }}
-        handleIndicatorStyle={{
-          backgroundColor: '#ccc',
-          width: 60,
-        }}
-      >
-
-
-        <BottomSheetView style={styles.container}>
+    <BottomSheet
+      ref={sheetRef}
+      index={index}
+      snapPoints={snapPoints}
+      enableDynamicSizing={false}
+      enablePanDownToClose
+      onClose={onClose}
+      backgroundStyle={{
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+      }}
+    >
+      <BottomSheetView style={styles.container}>
 
         <View style={styles.titleRow}>
-          
+          <Text style={styles.title}>
+            {mode === 'normal'
+              ? (selectedFacility?.name ?? '大阪市役所')
+              : '避難所状況'}
+          </Text>
 
-        <Text style={styles.title}>
-          {mode === MODES.NORMAL
-            ? (selectedFacility?.name ?? '大阪市役所')
-            : '避難所状況'}
-        </Text>
-
-          {mode === MODES.NORMAL && (
+          {mode === 'normal' && (
             <TouchableOpacity
-              style={styles.reserveButton
-                
-              }
-             onPress={() => router.push('../reservation')}
+              style={styles.reserveButton}
+              onPress={() => router.push('../reservation')}
             >
-              <Text style={styles.reserveButtonText}>
-                予約
-              </Text>
+              <Text style={styles.reserveButtonText}>予約</Text>
             </TouchableOpacity>
           )}
-
         </View>
 
-          {/* ========================= */}
-          {/* NORMAL MODE */}
-          {/* ========================= */}
-          {mode === MODES.NORMAL ? (
-            <NormalModeContent
-              officeServices={officeServices}
-              loading={loading}
-              lastUpdate={lastUpdate}
-              onRefresh={() =>
-                selectedFacility?.facility_id &&
-                onRefresh(selectedFacility.facility_id)
-              }
-            />
-          ) : (
-            /* ========================= */
-            /* DISASTER MODE */
-            /* ========================= */
+        {mode === 'normal' ? (
+          <NormalModeContent
+            officeServices={officeServices}
+            loading={loading}
+            lastUpdate={lastUpdate}
+            onRefresh={() =>
+              selectedFacility?.facility_id &&
+              onRefresh(selectedFacility.facility_id)
+            }
+          />
+        ) : (
+          <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
+            <DisasterModeContent expanded={true} />
+          </BottomSheetScrollView>
+        )}
 
-            <BottomSheetScrollView
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <DisasterModeContent expanded={true} />
-            </BottomSheetScrollView>
-          )}
-
-        </BottomSheetView>
-
-      </BottomSheet>
-
-
-      {mode === MODES.DISASTER && (
-        <View style={styles.fixedStatsContainer}>
-
-          <View style={styles.statBox}>
-            <Text style={styles.statTitle}>移動中</Text>
-            <Text style={styles.statValue}>6人</Text>
-            <Image
-              source={require('../../../assets/images/arukuhito.png')}
-              style={styles.statImage}
-            />
-          </View>
-
-          <View style={styles.statBox2}>
-            <Text style={styles.statTitle}>収容される</Text>
-            <Text style={styles.statValue}>12人</Text>
-            <Image
-              source={require('../../../assets/images/hinan.png')}
-              style={styles.statImage}
-            />
-          </View>
-
-        </View>
-      )}
-    </>
+      </BottomSheetView>
+    </BottomSheet>
   );
 }
-// ===== Style =====
-const styles = StyleSheet.create({
 
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
-
-  title: {
-  fontSize: 22,
-  fontWeight: 'bold',
-},
   titleRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 16,
-},
-
-  scrollContent: {
-    paddingBottom: 200, 
-  },
-
-  fixedStatsContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 12,
-
     flexDirection: 'row',
-    gap: 12,
-
-    backgroundColor: '#fff',
-    zIndex: 999,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-
-  statBox: {
-    flex: 1,
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  scrollContent: {
+    paddingBottom: 200,
+  },
+  reserveButton: {
     backgroundColor: '#FFEE37',
-    borderRadius: 12,
-    height: 140,
-    padding: 12,
+    paddingHorizontal: 30,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-
-  statBox2: {
-    flex: 1,
-    backgroundColor: '#D9D9D9',
-    borderRadius: 12,
-    height: 140,
-    padding: 12,
-  },
-
-  statTitle: {
-    fontSize: 18,
+  reserveButtonText: {
+    color: '#000',
     fontWeight: 'bold',
   },
-
-  statValue: {
-    position: 'absolute',
-    left: 12,
-    bottom: 10,
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-
-  statImage: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-    width: 50,
-    height: 50,
-  },
-  // ===== 予約ボタン =====
-reserveButton: {
-  backgroundColor: '#FFEE37',
-  paddingHorizontal: 30,
-  paddingVertical: 8,
-  borderRadius: 20,
-},
-
-reserveButtonText: {
-  color: '#000',
-  fontSize: 14,
-  fontWeight: 'bold',
-},
 });

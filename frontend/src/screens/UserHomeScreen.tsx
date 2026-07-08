@@ -203,21 +203,31 @@ const url =
     : `${API_URL}/facilities`;
 
     const response = await fetch(url);
-    const data = await response.json();
+const data = await response.json();
+
+const list = data as Facility[];
 
     setFacilities(data);
 
     if (data.length > 0) {
-      mapRef.current?.animateToRegion(
-        {
-          latitude: data[0].latitude,
-          longitude: data[0].longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
+  setTimeout(() => {
+    mapRef.current?.fitToCoordinates(
+      list.map((facility) => ({
+  latitude: facility.latitude,
+  longitude: facility.longitude,
+})),
+      {
+        edgePadding: {
+          top: 80,
+          right: 80,
+          bottom: 80,
+          left: 80,
         },
-        1000
-      );
-    }
+        animated: true,
+      }
+    );
+  }, 300);
+}
   } catch (e) {
     console.log(e);
   } finally {
@@ -303,7 +313,6 @@ const url =
 
                 setSelectedFacility(facility);
                 fetchOfficeServices(facility.facility_id);
-                // 這行可以先留，但不是關鍵
                 setShowBottomSheet(true);
               }}
             />
@@ -399,18 +408,18 @@ const url =
                   selectedQuickSearch === item.title &&
                     styles.activeQuickSearchButton
                 ]}
-               onPress={() => {
+                onPress={() => {
                   if (selectedQuickSearch === item.title) {
                     setSelectedQuickSearch(null);
-
-                    // ★顯示全部
                     fetchFacilities(null);
-                    return;
+                  } else {
+                    setSelectedQuickSearch(item.title);
+                    fetchFacilities(TYPE_MAP[item.title]);
                   }
 
-                  setSelectedQuickSearch(item.title);
-                  const dbType = TYPE_MAP[item.title];
-                   fetchFacilities(dbType);
+                  setSelectedFacility(null);
+                  setShowBottomSheet(false);
+                  setOfficeServices([]);
                 }}
               >
 
@@ -519,13 +528,15 @@ const url =
         {/* ===== BottomSheet ===== */}
         {showBottomSheet && (
           <HomeBottomSheet
-            mode={mode}
-            officeServices={officeServices}
-            loading={loading}
-            lastUpdate={lastUpdate}
-            onRefresh={fetchOfficeServices}
-            selectedFacility={selectedFacility}
-          />
+        mode={mode}
+        officeServices={officeServices}
+        loading={loading}
+        lastUpdate={lastUpdate}
+        onRefresh={fetchOfficeServices}
+        selectedFacility={selectedFacility}
+        visible={showBottomSheet}
+        onClose={() => setShowBottomSheet(false)}
+      />
         )}
 
         {/* ===== 詳細モーダル ===== */}
