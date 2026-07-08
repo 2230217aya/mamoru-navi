@@ -48,6 +48,7 @@ import {
   convertGeoJsonToMapPoints,
   findNearestPointIndex,
   getDistance,
+  decodeGooglePolyline,
 } from "@/src/utils/mapUtils";
 
 // ===== ネットワーク状態 =====
@@ -152,6 +153,10 @@ export default function UserHome() {
   const [distanceToGoal, setDistanceToGoal] = useState<number | null>(null); // 残り距離
   const [isArrived, setIsArrived] = useState(false); // 到着判定フラグ
   const [heading, setHeading] = useState<number>(0); // デバイスの向き(0-359度)自分の歩いている方向が分かるようにする
+  const [nearShelters, setNearShelters] = useState<Shelter[]>([]); //ユーザーの現在地から近い順に抽出された上位3件の避難所リスト。災害モード時に、画面下部の選択カード（スワイプメニュー）に表示するデータとして使用。
+  const [selectedShelterId, setSelectedShelterId] = useState<string | null>(
+    null,
+  ); //避難所選択カードにおいて、ユーザーが現在選択している避難所のID。 カードのハイライト表示（青枠など）や、ナビゲーション目的地の決定、 および地図上のカメラ移動先を特定するために使用。初期値はnull。
 
   // ---------------------------------------------------------
   // 3. 外部参照・固定データ (Refs & Constants)
@@ -183,6 +188,35 @@ export default function UserHome() {
   // 一番近い点から最後（避難所）までのルートだけを抽出（過去の道をカット）
   const remainingRoute =
     nearestIdx !== -1 ? routeCoordinates.slice(nearestIdx) : routeCoordinates;
+
+  /**
+   * 目的：自分から近い上位3つの避難所を自動抽出する
+   * 発火タイミング：避難所データ(shelters)が届いた時、または現在地(origin)が動いた時
+   * 用途：災害モード時にユーザーに選択肢として提示する「避難所スワイプカード」に使用
+   */
+  useEffect(() => {
+    console.log("🔍 nearShelters計算チェック:", {
+      sheltersCount: shelters.length,
+      hasOrigin: !!origin,
+    });
+
+    if (shelters.length > 0 && origin) {
+      const sorted = shelters
+        .map((s) => ({
+          ...s,
+          distance: getDistance(
+            origin.latitude,
+            origin.longitude,
+            s.latitude,
+            s.longitude,
+          ),
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 3); // 近い順3つ
+      console.log("📍 nearShelters の中身:", sorted.length, "件"); // これが 0 だとカードは出ません
+      setNearShelters(sorted);
+    }
+  }, [shelters, origin]);
 
   // ---------------------------------------------------------
   // 5. API通信関数 (Data Fetching)
@@ -260,42 +294,84 @@ export default function UserHome() {
 
   /**
    * 災害時：避難計画（ルート）の取得
+   * オンライン時：Google Directions API でのルート
+   * オフライン時：SQLiteから直近のバックアップを抽出
    */
-  const loadEvacuationPlan = async () => {
+  const loadEvacuationPlan = async (destinationStr?: string) => {
     // 取得前に表示をクリア
     setRouteCoordinates([]);
     setDestination(null);
 
     const testUserId = "11111111-1111-1111-1111-111111111111";
+    const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || "";
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     try {
-      // --- A. オンライン試行 ---
+      // --- A. オンライン試行：Google Directions API ---
+      console.log("🌐 Google Maps への接続を試行中...");
+      // 目的地が決まっていない場合は、nearSheltersの1件目を使う
+      const targetDest =
+        destinationStr ||
+        (nearShelters[0]
+          ? `${nearShelters[0].latitude},${nearShelters[0].longitude}`
+          : "34.6937,135.5022"); // 最終フォールバック
+
       const response = await fetch(
-        `${getBaseUrl()}/map/my-plan/${testUserId}`,
-        {
-          headers: API_HEADERS,
-          signal: controller.signal,
-        },
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${targetDest}&mode=walking&key=${GOOGLE_API_KEY}`,
+        { signal: controller.signal },
       );
 
-      if (!response.ok) throw new Error("ServerDown");
-
       const data = await response.json();
-      if (data && data.status === "success" && data.plan) {
-        console.log("✅ オンライン成功（赤色表示）");
+
+      if (data.status === "OK") {
+        console.log("✅ Google API 成功");
+
+        // 【デバッグ：ここで落ちていないか？】
+        if (!data.routes || !data.routes[0].overview_polyline) {
+          throw new Error("Googleのレスポンス形式が想定外です");
+        }
+
+        const points = decodeGooglePolyline(
+          data.routes[0].overview_polyline.points,
+        );
+        console.log(`📍 座標変換成功: ${points.length}件`);
+
         setIsOnline(true);
-        const points = convertGeoJsonToMapPoints(data.plan.route_data);
         setRouteCoordinates(points);
         if (points.length > 0) setDestination(points[points.length - 1]);
-        await LocalDB.saveMyEvacuationPlan(data.plan);
+
+        try {
+          console.log("💾 SQLite保存開始...");
+          await LocalDB.saveMyEvacuationPlan({
+            plan_id: `google_${Date.now()}`,
+            user_id: "11111111-1111-1111-1111-111111111111",
+            route_data: {
+              type: "Feature",
+              geometry: {
+                type: "LineString",
+                coordinates: points.map((p) => [p.longitude, p.latitude]),
+              },
+            },
+          });
+          console.log("✅ SQLite保存完了");
+        } catch (dbError) {
+          console.error("❌ SQLite保存中にエラー:", dbError);
+          // 保存失敗しても、ルート表示はできているので、そのまま return させてあげる
+        }
+
+        clearTimeout(timeoutId);
+        return; // ←ここを通れば catch には行かないはず
+      } else {
+        throw new Error(`Google API Status: ${data.status}`);
       }
-      clearTimeout(timeoutId);
     } catch (error) {
       clearTimeout(timeoutId);
-      console.log("⚠️ オフライン：オレンジ色表示へ切り替え");
+      console.log(
+        "⚠️ オフラインまたはGoogle取得失敗：SQLiteバックアップへ移行",
+      );
       setIsOnline(false);
+
       // UserHomeScreen.tsx 内 loadEvacuationPlan の catch ブロック内
 
       // 1. 全保存プランを取得
@@ -307,10 +383,10 @@ export default function UserHome() {
       }
 
       // 2. 最適なプランを選ぶIf文ロジック
-      let bestPlan: any = null; // ★ bestPlan に any または具体的な型を付ける
+      let bestPlan: any = null;
       let minDistance = Infinity;
 
-      // ★ plan に明示的に any を付けることで 'never' エラーを回避
+      // plan に明示的に any を付けることで 'never' エラーを回避
       cachedPlans.forEach((plan: any) => {
         if (plan.route_data && plan.route_data.coordinates) {
           const start = plan.route_data.coordinates[0];
@@ -353,6 +429,29 @@ export default function UserHome() {
     );
   };
 
+  /**
+   * 避難所選択時の処理：選択された避難所を目的地に設定し、Googleルートを再取得する
+   */
+  const handleSelectShelter = (shelter: Shelter) => {
+    setSelectedShelterId(shelter.shelter_id);
+    setSelectedShelter(shelter);
+
+    // 目的地を文字列(緯度,経度)に変換して、ルート検索を実行
+    const dest = `${shelter.latitude},${shelter.longitude}`;
+    loadEvacuationPlan(dest);
+
+    // 地図を選択した避難所の方向へスムーズに移動
+    mapRef.current?.animateToRegion(
+      {
+        latitude: shelter.latitude,
+        longitude: shelter.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      1000,
+    );
+  };
+
   // ---------------------------------------------------------
   // 7. 副作用監視 (Side Effects)
   // ---------------------------------------------------------
@@ -360,6 +459,7 @@ export default function UserHome() {
   // A. マウント時初期化
   useEffect(() => {
     fetchOfficeServices();
+    fetchShelters(); // 避難所リストを取得
     loadEvacuationPlan(); // 事前の備蓄を試みる
   }, []);
 
@@ -471,6 +571,8 @@ export default function UserHome() {
   return (
     <RootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
+        {/* 開発確認用タグ */}
+
         {/* ===== 地図本体 ===== */}
         <MapView
           ref={mapRef}
@@ -555,48 +657,53 @@ export default function UserHome() {
 
               {/* ④ [点] 周辺の避難所リスト */}
               {/* ===== 避難所マーカー ===== */}
-              {shelters.map((shelter) => (
-                <Marker
-                  key={shelter.shelter_id}
-                  coordinate={{
-                    latitude: shelter.latitude,
-                    longitude: shelter.longitude,
-                  }}
-                  pinColor="red"
-                  title={shelter.name}
-                  description={`${shelter.address} / 収容人数: ${shelter.capacity}人`}
-                  onPress={() => {
-                    setSelectedShelter(shelter);
-                    console.log("選択された避難所 onPress:", shelter);
-                  }}
-                  onSelect={() => {
-                    setSelectedShelter(shelter);
-                    console.log("選択された避難所 onSelect:", shelter);
-                  }}
-                >
-                  <Callout
-                    onPress={() => {
-                      setSelectedShelter(shelter);
-                      console.log("選択された避難所 Callout:", shelter);
+              {shelters.map((shelter) => {
+                // ★ 追加：今の shelter が「目的地(destination)」と同じ座標かチェック
+                // 誤差を考慮して完全に一致するか、目的地が存在しない場合のみ描画
+                const isTarget =
+                  destination &&
+                  Math.abs(shelter.latitude - destination.latitude) < 0.0001 &&
+                  Math.abs(shelter.longitude - destination.longitude) < 0.0001;
+
+                // すでに「⑤」で描画するので、ここではスキップ（nullを返す）
+                if (isTarget) return null;
+
+                return (
+                  <Marker
+                    key={shelter.shelter_id}
+                    coordinate={{
+                      latitude: shelter.latitude,
+                      longitude: shelter.longitude,
                     }}
+                    pinColor="red" // 目的地以外のピン
+                    title={shelter.name}
+                    onPress={() => handleSelectShelter(shelter)}
                   >
-                    <View>
-                      <Text>{shelter.name}</Text>
-                      <Text>{shelter.address}</Text>
-                      <Text>収容人数: {shelter.capacity}人</Text>
-                    </View>
-                  </Callout>
-                </Marker>
-              ))}
+                    <Callout>
+                      <View style={{ padding: 5 }}>
+                        <Text style={{ fontWeight: "bold" }}>
+                          {shelter.name}
+                        </Text>
+                        <Text style={{ fontSize: 12 }}>
+                          収容人数: {shelter.capacity}人
+                        </Text>
+                      </View>
+                    </Callout>
+                  </Marker>
+                );
+              })}
 
               {/* ⑤ [点] ★ナビの目的地：最優先で表示 */}
               {destination && (
                 <Marker
                   key={`shelter-marker-${isOnline ? "online" : "offline"}`}
                   coordinate={destination}
-                  pinColor={isOnline ? "red" : "orange"}
-                  title="指定避難所"
+                  // ★ 目的地は青や特別な色にすると分かりやすい（お好みで！）
+                  // pinColor={isOnline ? "#007AFF" : "#FF9500"}
+                  pinColor={isOnline ? "blue" : "orange"}
+                  title="目的地"
                   zIndex={15}
+                  flat={false}
                 />
               )}
             </>
@@ -799,10 +906,88 @@ export default function UserHome() {
           </TouchableOpacity>
         </View>
 
+        {/* 災害時オンライン用の避難所選択リスト */}
+        {mode === MODES.DISASTER && isOnline && nearShelters.length > 0 && (
+          <View style={styles.shelterSelectorWrapper}>
+            {/* ★ 変更ポイント：未選択 (!selectedShelterId) の時だけカードを出す */}
+            {!selectedShelterId ? (
+              <>
+                <Text style={styles.selectorTitle}>
+                  避難所を選択してください
+                </Text>
+                <View style={{ height: 150 }}>
+                  <Animated.ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 15, gap: 12 }}
+                  >
+                    {nearShelters.map((item) => (
+                      <TouchableOpacity
+                        key={item.shelter_id}
+                        style={styles.shelterCard}
+                        onPress={() => handleSelectShelter(item)}
+                      >
+                        <View style={styles.shelterCardHeader}>
+                          <Text
+                            style={styles.shelterCardName}
+                            numberOfLines={1}
+                          >
+                            {item.name}
+                          </Text>
+                        </View>
+                        <Text style={styles.shelterCardSub} numberOfLines={1}>
+                          {item.address}
+                        </Text>
+                        <View style={styles.shelterCardTags}>
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>
+                              収容:{item.capacity}人
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.selectBtnText}>
+                          ここへのルートを表示 →
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </Animated.ScrollView>
+                </View>
+              </>
+            ) : (
+              // ★ 変更ポイント：避難所が「選択済み」の時は、画面をスッキリさせるためにボタン1つにする
+              <TouchableOpacity
+                style={styles.changeShelterButton}
+                onPress={() => {
+                  setSelectedShelterId(null);
+                  setSelectedShelter(null); // クリアしてカード選択に戻る
+                }}
+              >
+                <Ionicons name="swap-horizontal" size={20} color="#007AFF" />
+                <Text style={styles.changeBtnText}>避難先を変更する</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ネットワークモード表示 */}
+        {/* <View
+          style={{
+            position: "absolute",
+            top: 100,
+            left: 20,
+            backgroundColor: "white",
+          }}
+        >
+          <Text>
+            現在のモード: {isOnline ? "✅オンライン(赤)" : "🧡オフライン(橙)"}
+          </Text>
+        </View> */}
+
         {/* ===== BottomSheet ===== */}
         {showBottomSheet && (
           <HomeBottomSheet
             mode={mode}
+            selectedShelter={selectedShelter}
             officeServices={officeServices}
             loading={loading}
             lastUpdate={lastUpdate}
@@ -1267,5 +1452,97 @@ const styles = StyleSheet.create({
     borderRadius: 30,
   },
   qrButtonText: { fontWeight: "bold", fontSize: 16 },
+  shelterSelectorWrapper: {
+    position: "absolute",
+    bottom: 300, // HomeBottomSheet(snapPoints)の上に乗る位置
+    left: 0,
+    right: 0,
+    alignItems: "center", // 中央寄せ
+    zIndex: 100,
+  },
+  selectorTitle: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+    alignSelf: "flex-start", // タイトルは左寄せ
+    marginLeft: 20,
+    marginBottom: 8,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 5,
+  },
+  // 選択後に表示されるスリムなボタン
+  changeShelterButton: {
+    backgroundColor: "white",
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+    alignItems: "center",
+    gap: 8,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    marginBottom: 20, // 少し上に浮かせる
+  },
+  changeBtnText: {
+    color: "#007AFF",
+    fontWeight: "bold",
+    fontSize: 15,
+  },
+  shelterCard: {
+    width: 260,
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 15,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  selectedShelterCard: {
+    borderColor: "#007AFF",
+    backgroundColor: "#f0f7ff",
+  },
+  shelterCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  shelterCardName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  shelterCardSub: {
+    fontSize: 12,
+    color: "#777",
+    marginBottom: 8,
+  },
+  shelterCardTags: {
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: 8,
+  },
+  tag: {
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  tagText: {
+    fontSize: 10,
+    color: "#666",
+  },
+  selectBtnText: {
+    fontSize: 12,
+    color: "#007AFF",
+    fontWeight: "bold",
+    textAlign: "right",
+  },
 });
 // 開発環境のみ表示　end
