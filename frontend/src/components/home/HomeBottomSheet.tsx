@@ -37,15 +37,15 @@ type Props = {
   lastUpdate: string;
   onRefresh: (facilityId: string) => void;
   selectedFacility: Facility | null;
-  visible: boolean;   // ⭐ 新增控制開關
-  onClose: () => void; // ⭐ 關閉用
+  visible: boolean;
+  onClose: () => void;
 };
 const MODES = {
   NORMAL: 'normal',
   DISASTER: 'disaster',
 };
 export default function HomeBottomSheet({
-  
+
   mode,
   officeServices,
   loading,
@@ -62,9 +62,9 @@ export default function HomeBottomSheet({
 
   const sheetRef = useRef<BottomSheet>(null);
 
-const index = !visible
-  ? -1
-  : 0;
+  const index = !visible
+    ? -1
+    : 0;
 
   useEffect(() => {
     if (!selectedFacility?.facility_id) return;
@@ -72,86 +72,86 @@ const index = !visible
   }, [selectedFacility]);
 
   return (
-    
+
     <>
-    {/* ===== BottomSheet ===== */}
-    <BottomSheet
-      ref={sheetRef}
-      index={index}
-      snapPoints={snapPoints}
-      enableDynamicSizing={false}
-      enablePanDownToClose={mode === MODES.NORMAL}
-      onClose={onClose}
-      backgroundStyle={{
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-      }}
-    >
-      <BottomSheetView style={styles.container}>
+      {/* ===== BottomSheet ===== */}
+      <BottomSheet
+        ref={sheetRef}
+        index={index}
+        snapPoints={snapPoints}
+        enableDynamicSizing={false}
+        enablePanDownToClose={mode === MODES.NORMAL}
+        onClose={onClose}
+        backgroundStyle={{
+          backgroundColor: '#fff',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+        }}
+      >
+        <BottomSheetView style={styles.container}>
 
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>
-            {selectedFacility?.name ?? '施設情報'}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>
+              {selectedFacility?.name ?? '施設情報'}
+            </Text>
 
-          {mode === MODES.NORMAL && (
-            <TouchableOpacity
-              style={styles.reserveButton}
-              onPress={() => router.push('../reservation')}
-            >
-              <Text style={styles.reserveButtonText}>予約</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        {/* ========================= */}
-        {/* NORMAL MODE */}
-        {/* ========================= */}
-
-        {mode === MODES.NORMAL ? (
-          <NormalModeContent
-            officeServices={officeServices}
-            loading={loading}
-            lastUpdate={lastUpdate}
-            onRefresh={() =>
-              selectedFacility?.facility_id &&
-              onRefresh(selectedFacility.facility_id)
-            }
-          />
-        ) : (
-          <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
-            <DisasterModeContent expanded={true} />
-          </BottomSheetScrollView>
-        )}
-
-      </BottomSheetView>
-    </BottomSheet>
-       {/* ========================= */
-       /* DISASTER MODE */
-      /* ========================= */ }
-      {mode === MODES.DISASTER && (
-              <View style={styles.fixedStatsContainer}>
-
-                <View style={styles.statBox}>
-                  <Text style={styles.statTitle}>移動中</Text>
-                  <Text style={styles.statValue}>6人</Text>
-                  <Image
-                    source={require('../../../assets/images/arukuhito.png')}
-                    style={styles.statImage}
-                  />
-                </View>
-
-                <View style={styles.statBox2}>
-                  <Text style={styles.statTitle}>収容される</Text>
-                  <Text style={styles.statValue}>12人</Text>
-                  <Image
-                    source={require('../../../assets/images/hinan.png')}
-                    style={styles.statImage}
-                  />
-                </View>
-
-              </View>
+            {mode === MODES.NORMAL && (
+              <TouchableOpacity
+                style={styles.reserveButton}
+                onPress={() => router.push('../reservation')}
+              >
+                <Text style={styles.reserveButtonText}>予約</Text>
+              </TouchableOpacity>
             )}
+          </View>
+          {/* ========================= */}
+          {/* NORMAL MODE */}
+          {/* ========================= */}
+
+          {mode === MODES.NORMAL ? (
+            <NormalModeContent
+              officeServices={officeServices}
+              loading={loading}
+              lastUpdate={lastUpdate}
+              onRefresh={() =>
+                selectedFacility?.facility_id &&
+                onRefresh(selectedFacility.facility_id)
+              }
+            />
+          ) : (
+            <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
+              <DisasterModeContent expanded={true} />
+            </BottomSheetScrollView>
+          )}
+
+        </BottomSheetView>
+      </BottomSheet>
+      {/* ========================= */
+       /* DISASTER MODE */
+      /* ========================= */}
+      {mode === MODES.DISASTER && (
+        <View style={styles.fixedStatsContainer}>
+
+          <View style={styles.statBox}>
+            <Text style={styles.statTitle}>移動中</Text>
+            <Text style={styles.statValue}>6人</Text>
+            <Image
+              source={require('../../../assets/images/arukuhito.png')}
+              style={styles.statImage}
+            />
+          </View>
+
+          <View style={styles.statBox2}>
+            <Text style={styles.statTitle}>収容される</Text>
+            <Text style={styles.statValue}>12人</Text>
+            <Image
+              source={require('../../../assets/images/hinan.png')}
+              style={styles.statImage}
+            />
+          </View>
+
+        </View>
+      )}
     </>
   );
 }
@@ -167,18 +167,18 @@ const styles = StyleSheet.create({
   },
 
   title: {
-  fontSize: 22,
-  fontWeight: 'bold',
-},
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
   titleRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 16,
-},
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
 
   scrollContent: {
-    paddingBottom: 200, 
+    paddingBottom: 200,
   },
 
   fixedStatsContainer: {
@@ -235,16 +235,16 @@ const styles = StyleSheet.create({
     height: 50,
   },
   // ===== 予約ボタン =====
-reserveButton: {
-  backgroundColor: '#FFEE37',
-  paddingHorizontal: 30,
-  paddingVertical: 8,
-  borderRadius: 20,
-},
+  reserveButton: {
+    backgroundColor: '#FFEE37',
+    paddingHorizontal: 30,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
 
-reserveButtonText: {
-  color: '#000',
-  fontSize: 14,
-  fontWeight: 'bold',
-},
+  reserveButtonText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
 });

@@ -121,10 +121,10 @@ export default function UserHome() {
 
   // ===== BottomSheet表示状態 =====
   const [showBottomSheet, setShowBottomSheet] = useState(false);
-  
-// ===== 選択されたクイック検索 =====
-const [selectedQuickSearch, setSelectedQuickSearch] =
-  useState<string | null>(null);
+
+  // ===== 選択されたクイック検索 =====
+  const [selectedQuickSearch, setSelectedQuickSearch] =
+    useState<string | null>(null);
   // ===== 現在モード =====
   const [mode, setMode] = useState(MODES.NORMAL);
 
@@ -194,51 +194,51 @@ const [selectedQuickSearch, setSelectedQuickSearch] =
     },
   ];
   const fitFacilities = (list: Facility[]) => {
-  if (list.length === 0) return;
+    if (list.length === 0) return;
 
-  mapRef.current?.fitToCoordinates(
-    list.map((facility) => ({
-      latitude: facility.latitude,
-      longitude: facility.longitude,
-    })),
-    {
-      edgePadding: {
-        top: 80,
-        right: 80,
-        bottom: 80,
-        left: 80,
-      },
-      animated: true,
+    mapRef.current?.fitToCoordinates(
+      list.map((facility) => ({
+        latitude: facility.latitude,
+        longitude: facility.longitude,
+      })),
+      {
+        edgePadding: {
+          top: 80,
+          right: 80,
+          bottom: 80,
+          left: 80,
+        },
+        animated: true,
+      }
+    );
+  };
+  const fetchFacilities = async (type?: string | null) => {
+    try {
+      setLoading(true);
+
+      const url =
+        type && type.trim().length > 0
+          ? `${API_URL}/facilities?type=${encodeURIComponent(type)}`
+          : `${API_URL}/facilities`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const list = data as Facility[];
+
+      setFacilities(data);
+
+      if (mode === MODES.NORMAL) {
+        setTimeout(() => {
+          fitFacilities(list);
+        }, 300);
+      }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
     }
-  );
-};
-const fetchFacilities = async (type?: string | null) => {
-  try {
-    setLoading(true);
-
-const url =
-  type && type.trim().length > 0
-    ? `${API_URL}/facilities?type=${encodeURIComponent(type)}`
-    : `${API_URL}/facilities`;
-
-    const response = await fetch(url);
-const data = await response.json();
-
-const list = data as Facility[];
-
-    setFacilities(data);
-
-if (mode === MODES.NORMAL) {
-  setTimeout(() => {
-    fitFacilities(list);
-  }, 300);
-}
-  } catch (e) {
-    console.log(e);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // ===== API取得 =====
   const fetchOfficeServices = async (facilityId?: string) => {
@@ -248,8 +248,8 @@ if (mode === MODES.NORMAL) {
       setLoading(true);
 
       const res = await fetch(
-      `${API_URL}/facilities/${facilityId}/office-services`
-        );
+        `${API_URL}/facilities/${facilityId}/office-services`
+      );
       const data = await res.json();
 
       setOfficeServices(data);
@@ -276,9 +276,9 @@ if (mode === MODES.NORMAL) {
 
   // ===== 初期読み込み =====
   useEffect(() => {
-  fetchOfficeServices();
-  fetchFacilities(null); // ← 改這裡
-}, []);
+    fetchOfficeServices();
+    fetchFacilities(null); // ← 改這裡
+  }, []);
 
 
 
@@ -294,49 +294,49 @@ if (mode === MODES.NORMAL) {
           style={styles.map}
           googleRenderer="LEGACY"
           initialRegion={{
-          latitude: 34.6937,
-          longitude: 135.5023,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-         }}
+            latitude: 34.6937,
+            longitude: 135.5023,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          }}
         >
 
           {mode === MODES.NORMAL ? (
 
             // ===== 平常モード施設マーカー =====
             <>
-            {facilities.map((facility) => (
-              <Marker
-                key={facility.facility_id}
-                coordinate={{
-                  latitude: facility.latitude,
-                  longitude: facility.longitude,
-                }}
-                image={
-                  facility.type === "city_hall"
-                    ? require("../../assets/images/markers/cityhall.png")
-                    : facility.type === "library"
-                    ? require("../../assets/images/markers/library.png")
-                    : require("../../assets/images/markers/gym.png")
-                }
-                onPress={() => {
-                  setSelectedFacility(facility);
-                  fetchOfficeServices(facility.facility_id);
-                  setShowBottomSheet(true);
+              {facilities.map((facility) => (
+                <Marker
+                  key={facility.facility_id}
+                  coordinate={{
+                    latitude: facility.latitude,
+                    longitude: facility.longitude,
+                  }}
+                  image={
+                    facility.type === "city_hall"
+                      ? require("../../assets/images/markers/cityhall.png")
+                      : facility.type === "library"
+                        ? require("../../assets/images/markers/library.png")
+                        : require("../../assets/images/markers/gym.png")
+                  }
+                  onPress={() => {
+                    setSelectedFacility(facility);
+                    fetchOfficeServices(facility.facility_id);
+                    setShowBottomSheet(true);
 
-                  mapRef.current?.animateToRegion(
-                    {
-                      latitude: facility.latitude,
-                      longitude: facility.longitude,
-                      latitudeDelta: 0.003,
-                      longitudeDelta: 0.003,
-                    },
-                    500
-                  );
-                }}
-              />
-            ))}
-          </>
+                    mapRef.current?.animateToRegion(
+                      {
+                        latitude: facility.latitude,
+                        longitude: facility.longitude,
+                        latitudeDelta: 0.003,
+                        longitudeDelta: 0.003,
+                      },
+                      500
+                    );
+                  }}
+                />
+              ))}
+            </>
 
           ) : (
 
@@ -425,7 +425,7 @@ if (mode === MODES.NORMAL) {
                 style={[
                   styles.quickSearchButton,
                   selectedQuickSearch === item.title &&
-                    styles.activeQuickSearchButton
+                  styles.activeQuickSearchButton
                 ]}
                 onPress={() => {
                   if (selectedQuickSearch === item.title) {
@@ -547,21 +547,21 @@ if (mode === MODES.NORMAL) {
         {/* ===== BottomSheet ===== */}
         {showBottomSheet && (
           <HomeBottomSheet
-        mode={mode}
-        officeServices={officeServices}
-        loading={loading}
-        lastUpdate={lastUpdate}
-        onRefresh={fetchOfficeServices}
-        selectedFacility={selectedFacility}
-        visible={showBottomSheet}
-        onClose={() => {
-          setShowBottomSheet(false);
+            mode={mode}
+            officeServices={officeServices}
+            loading={loading}
+            lastUpdate={lastUpdate}
+            onRefresh={fetchOfficeServices}
+            selectedFacility={selectedFacility}
+            visible={showBottomSheet}
+            onClose={() => {
+              setShowBottomSheet(false);
 
-          if (mode === MODES.NORMAL) {
-            fitFacilities(facilities);
-          }
-        }}
-      />
+              if (mode === MODES.NORMAL) {
+                fitFacilities(facilities);
+              }
+            }}
+          />
         )}
 
         {/* ===== 詳細モーダル ===== */}
@@ -620,8 +620,8 @@ if (mode === MODES.NORMAL) {
 
   );
 }
-     
-    
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -633,31 +633,31 @@ const styles = StyleSheet.create({
     height: '100%',
     position: 'absolute',
   },
-// ヘッダー
+  // ヘッダー
   header: {
-   position: 'absolute',
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     backgroundColor: '#ffffff9c',
 
     paddingTop: 30,
-    paddingBottom: 10, 
+    paddingBottom: 10,
     paddingHorizontal: 5,
 
-  
+
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-//ヘッダーのicon
+  //ヘッダーのicon
   iconButton: {
     width: 48,
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
-//検索欄
+  //検索欄
   searchContainer: {
     flex: 1,
 
@@ -685,19 +685,19 @@ const styles = StyleSheet.create({
 
     elevation: 4,
   },
-//検索icon
+  //検索icon
   searchIcon: {
     marginRight: 8,
   },
-//検索
+  //検索
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: '#333',
   },
   // クイック検索アイテム
-    quickSearchContainer: {
-        position: 'absolute',
+  quickSearchContainer: {
+    position: 'absolute',
 
     top: 85,
     left: 10,
@@ -705,12 +705,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 6,
 
-    },
-    activeQuickSearchButton: {
-  backgroundColor: '#d0d0d0',
-},
+  },
+  activeQuickSearchButton: {
+    backgroundColor: '#d0d0d0',
+  },
 
-    quickSearchButton: {
+  quickSearchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -719,15 +719,15 @@ const styles = StyleSheet.create({
     marginRight: 6,
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    },
+  },
 
-    quickSearchText: {
+  quickSearchText: {
     color: '#666',
     fontSize: 12,
     fontWeight: 'bold',
-    },
+  },
 
-//下の情報欄
+  //下の情報欄
   bottomCard: {
     position: 'absolute',
     bottom: 0,
@@ -763,244 +763,244 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   cardHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-},
-infoRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginTop: 4,
-},
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
 
-closedText: {
-  fontSize: 13,
-  color: '#666',
-},
-
-
-reserveButton: {
-  backgroundColor: '#FFEE37',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 20,
-  width: '30%',
-  alignItems: 'center',
-},
-
-reserveButtonText: {
-  color: '#000000',
-  fontSize: 14,
-  fontWeight: '600',
-},
-
-detailLink: {
-  color: '#007AFF',
-  fontSize: 14,
-  fontWeight: '500',
-},
-
-updateRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginTop: 6,
-},
-
-updateText: {
-  
-  fontSize: 12,
-  color: '#888',
-},
-refreshButton: {
-  padding: 4,
-},
+  closedText: {
+    fontSize: 13,
+    color: '#666',
+  },
 
 
-statsContainer: {
-  flexDirection: 'row',
-  gap: 12,
-  marginTop: 10,
-},
-rowItem: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 10,
-},
-usuallystatBox: {
-  flex: 1,
-  backgroundColor: '#eeeeee',
-  padding: 12,
-  borderRadius: 12,
-  
-  
-},
-usuallyTitle: {
-  flex: 1,              
-  fontWeight: 'bold',
-  fontSize: 14,
-  color: '#000000',
-},
+  reserveButton: {
+    backgroundColor: '#FFEE37',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    width: '30%',
+    alignItems: 'center',
+  },
 
-numberText: {
-  fontSize: 14,
-  fontWeight: 'bold',
-  color: '#1976d2',
-  alignSelf: 'flex-end',
-},
-statBox: {
-   flex: 1,
-  backgroundColor: '#FFEE37',
-  padding: 12,
-  borderRadius: 12,
-  height: 140,
+  reserveButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 
-  position: 'relative',
-},
-statBox2: {
-  flex: 1,
-  backgroundColor: '#D9D9D9',
-  padding: 12,
-  borderRadius: 12,
-  alignItems: 'center',
-},
-statValueLeft: {
-  position: 'absolute',
-  bottom: 10,
-  left: 13,
+  detailLink: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
 
-  fontSize: 30,
-  fontWeight: 'bold',
-  color: '#000000',
-},
-//移動中・収容されるテキスト
-statTitle: {
-  position: 'absolute',
-  top: 10,
-  left: 10,
-  right: 0,
-  fontWeight: 'bold', 
+  updateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+  },
 
-  fontSize: 18,
-  color: '#000000',
-},
+  updateText: {
 
-statValue: {
-  position: 'absolute',
-  bottom: 10,
-  left: 10,
-
-  fontSize: 29,
-  fontWeight: 'bold',
-  color: '#1976d2',
-},
-statImage: {
-  position: 'absolute',
-  bottom: 8,
-  right: 8,
-  width: 50,
-  height: 50,
-},
+    fontSize: 12,
+    color: '#888',
+  },
+  refreshButton: {
+    padding: 4,
+  },
 
 
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+  },
+  rowItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  usuallystatBox: {
+    flex: 1,
+    backgroundColor: '#eeeeee',
+    padding: 12,
+    borderRadius: 12,
 
 
-modalOverlay: {
-  flex: 1,
-  justifyContent: 'flex-end',
-  backgroundColor: 'rgba(0, 0, 0, 0.03)',
-},
+  },
+  usuallyTitle: {
+    flex: 1,
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#000000',
+  },
 
-detailModal: {
-  backgroundColor: '#fff',
-  borderTopLeftRadius: 24,
-  borderTopRightRadius: 24,
-  padding: 24,
-  minHeight: '90%',
-},
+  numberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1976d2',
+    alignSelf: 'flex-end',
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#FFEE37',
+    padding: 12,
+    borderRadius: 12,
+    height: 140,
 
-modalHandle: {
-  width: 50,
-  height: 5,
-  backgroundColor: '#ccc',
-  borderRadius: 10,
-  alignSelf: 'center',
-  marginBottom: 20,
-},
+    position: 'relative',
+  },
+  statBox2: {
+    flex: 1,
+    backgroundColor: '#D9D9D9',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statValueLeft: {
+    position: 'absolute',
+    bottom: 10,
+    left: 13,
 
-modalTitle: {
-  fontSize: 22,
-  fontWeight: 'bold',
-  marginBottom: 20,
-},
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  //移動中・収容されるテキスト
+  statTitle: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 0,
+    fontWeight: 'bold',
 
-modalText: {
-  fontSize: 16,
-  marginBottom: 12,
-  color: '#444',
-},
+    fontSize: 18,
+    color: '#000000',
+  },
 
-closeButton: {
-  marginTop: 20,
-  backgroundColor: '#007AFF',
-  paddingVertical: 12,
-  borderRadius: 12,
-  alignItems: 'center',
-},
+  statValue: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
 
-closeButtonText: {
-  color: '#fff',
-  fontWeight: 'bold',
-  fontSize: 16,
-},
+    fontSize: 29,
+    fontWeight: 'bold',
+    color: '#1976d2',
+  },
+  statImage: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 50,
+    height: 50,
+  },
+
+
+
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+  },
+
+  detailModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    minHeight: '90%',
+  },
+
+  modalHandle: {
+    width: 50,
+    height: 5,
+    backgroundColor: '#ccc',
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+
+  modalText: {
+    fontSize: 16,
+    marginBottom: 12,
+    color: '#444',
+  },
+
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 
   // モード切替
   // 開発環境のみ表示　start
   modeContainer: {
-  position: 'absolute',
+    position: 'absolute',
 
-  top: 180,
-  left: 20,
-  right: 20,
+    top: 180,
+    left: 20,
+    right: 20,
 
-  flexDirection: 'row',
+    flexDirection: 'row',
 
-  backgroundColor: 'white',
+    backgroundColor: 'white',
 
-  borderRadius: 16,
+    borderRadius: 16,
 
-  padding: 6,
+    padding: 6,
 
-  gap: 8,
+    gap: 8,
 
-  elevation: 4,
-},
+    elevation: 4,
+  },
 
-modeButton: {
-  flex: 1,
+  modeButton: {
+    flex: 1,
 
-  paddingVertical: 1,
+    paddingVertical: 1,
 
-  borderRadius: 12,
+    borderRadius: 12,
 
-  alignItems: 'center',
-},
+    alignItems: 'center',
+  },
 
-activeModeButton: {
-  backgroundColor: '#c1defa',
-},
+  activeModeButton: {
+    backgroundColor: '#c1defa',
+  },
 
-modeText: {
-  fontSize: 15,
-  fontWeight: '600',
+  modeText: {
+    fontSize: 15,
+    fontWeight: '600',
 
-  color: '#8f8c8c',
-},
+    color: '#8f8c8c',
+  },
 
-activeModeText: {
-  color: 'white',
-},
+  activeModeText: {
+    color: 'white',
+  },
 });
- // 開発環境のみ表示　end
+// 開発環境のみ表示　end
