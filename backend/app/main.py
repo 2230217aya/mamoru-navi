@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db_connection, get_db
+from database_utils import seed_shelters
 from config import OLD_LOCATION_STALE_MINUTES
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -91,6 +92,9 @@ async def lifespan(app: FastAPI):
             cur.close()
             conn.close()
             print("✅ データベースの初期設定が完了しました。")
+
+            print("💾 避難所データの同期(Seeding)を開始します...")
+            seed_shelters() 
         except Exception as e:
             print(f"❌ DB初期化中にエラー発生: {e}")
     
