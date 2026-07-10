@@ -72,7 +72,8 @@ def get_office_services(facility_id: str):
                   fp.purpose_name,
                   COALESCE(
                     MAX(fr.issued_number) FILTER (
-                      WHERE fr.status = 'in_progress' AND DATE(fr.created_at) = CURRENT_DATE
+                        WHERE fr.status IN ('waiting', 'in_progress')
+                            AND DATE(fr.created_at) = CURRENT_DATE
                     ), 0
                   ) AS number
                 FROM facility_purposes fp
