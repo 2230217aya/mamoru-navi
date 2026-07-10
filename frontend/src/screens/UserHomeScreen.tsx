@@ -825,6 +825,7 @@ export default function UserHome() {
           </View>
         ) : (
           // ===== 災害モード：警報表示 =====
+
           <EmergencyAlertBanner
             level="5"
             title="緊急地震速報"
@@ -919,7 +920,7 @@ export default function UserHome() {
                   <Animated.ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: 15, gap: 12 }}
+                    contentContainerStyle={{ paddingHorizontal: 10, gap: 12 }}
                   >
                     {nearShelters.map((item) => (
                       <TouchableOpacity
@@ -992,7 +993,6 @@ export default function UserHome() {
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
-            selectedShelter={selectedShelter}
           />
         )}
 
