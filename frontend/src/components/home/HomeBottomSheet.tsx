@@ -25,7 +25,7 @@ type Facility = {
 };
 
 type OfficeService = {
-  id: number;
+  id: string;
   title: string;
   number: string;
 };
@@ -51,6 +51,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   selectedShelter?: Shelter | null;
+  facilityId: string;
 };
 
 const MODES = {
@@ -68,6 +69,7 @@ export default function HomeBottomSheet({
   visible,
   onClose,
   selectedShelter,
+  facilityId,
 }: Props) {
   const snapPoints = useMemo(() => {
     return mode === MODES.NORMAL ? ["16%", "47%"] : ["33%", "88%"];

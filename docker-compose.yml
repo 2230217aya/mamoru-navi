@@ -22,55 +22,29 @@ services:
       - "19000:19000"
       - "19001:19001"
       - "19002:19002"
+      - "8081:8081"
+      - "8082:8082"
+      - "8083:8083"
     volumes:
       - /app/node_modules # node_modulesはコンテナ内のものを使う（重要）
       - ./frontend:/app # PCのソースコードをコンテナに同期
+    environment:
+      - REACT_NATIVE_PACKAGER_HOSTNAME=192.168.137.1
     stdin_open: true # コンテナ内でコマンドを実行し続けるために必要
     tty: true
 
-  # --- 3. データベースサービス (シンプルで安定した起動を優先) ---
+  # 3. データベースサービス
   db:
-    build:
-      context: ./db
-      dockerfile: Dockerfile
-    container_name: mamoru-navi-db-1
-    restart: always
+    image: postgis/postgis:15-3.4 # PostGIS拡張機能が入ったPostgreSQLイメージ
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-      # 平常時の基本的なテーブル作成用SQLのみを残す
-      - ./backend/sql:/docker-entrypoint-initdb.d
+      - ./backend/sql:/docker-entrypoint-initdb.d # 初回起動時に自動でSQLを実行する
     ports:
       - "5432:5432"
     environment:
       - POSTGRES_DB=mamoru_navi_db
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mamoru_navi_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # --- 4. OSMインポート専用サービス (仕事が終われば自動停止) ---
-  osm_importer:
-    build:
-      context: ./db
-      dockerfile: Dockerfile
-    container_name: mamoru-navi-osm-importer
-    volumes:
-      - ./db/init-osm.sh:/init-osm.sh
-      - ./kansai-260621.osm.pbf:/tmp/kinki-latest.osm.pbf:ro
-      - .:/tmp/workdir # 抽出したosmファイルを保存して再利用するため
-    environment:
-      - PGHOST=db
-      - PGDATABASE=mamoru_navi_db
-      - PGUSER=user
-      - PGPASSWORD=password
-    # dbが完全に起動（Healthcheck OK）してから動き出す
-    depends_on:
-      db:
-        condition: service_healthy
-    command: bash /init-osm.sh
 
 volumes:
   postgres_data:

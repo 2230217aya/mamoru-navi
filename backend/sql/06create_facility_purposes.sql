@@ -56,4 +56,5 @@ VALUES
 (
     (SELECT type_id FROM facility_types WHERE type_name='city_hall'),
     '戸籍の提出・相談'
-);
+)
+ 

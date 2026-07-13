@@ -26,12 +26,9 @@ export default function ProfileConfirmScreen() {
 
       const fetchProfile = async () => {
         try {
-          const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
-
-          const response = await fetch(`${baseUrl}/users/profile`, {
-            method: "GET",
-            headers: API_HEADERS,
-          });
+          const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+          const response = await fetch(`${API_BASE_URL}/users/profile`);
+          if (!response.ok) throw new Error(`API error: ${response.status}`);
           const data = await response.json();
 
           if (isActive && data.status === "success") {

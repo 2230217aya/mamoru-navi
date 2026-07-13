@@ -1,4 +1,3 @@
-//frontend\src\screens\UserHomeScreen.tsx
 // ===== アイコン =====
 import { Ionicons } from '@expo/vector-icons';
 
@@ -6,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 // ===== 画面遷移 =====
+import { useFocusEffect, router } from 'expo-router';
 import { router } from 'expo-router';
 
 // ===== BottomSheet =====
@@ -36,7 +36,7 @@ import {
 } from 'react-native';
 
 // ===== React =====
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 // ===== 災害警報バナー =====
 import EmergencyAlertBanner from "../components/home/EmergencyAlertBanner";
@@ -71,7 +71,7 @@ const MODES = {
 
 // ===== 型定義 =====
 type OfficeService = {
-  id: number;
+  id: string;
   title: string;
   number: string;
 };
@@ -99,58 +99,102 @@ const QUICK_SEARCH_ITEMS = [
   {
     id: 1,
     title: '市区役所',
-    type: '市区役所',
   },
   {
     id: 2,
     title: '図書館',
-    type: '図書館',
   },
   {
     id: 3,
     title: '体育館',
-    type: '体育館',
   },
 ];
 
-const TYPE_MAP: Record<string, string> = {
-  市区役所: 'city_hall',
-  図書館: 'library',
-  体育館: 'gym',
-};
-
-// ===== 平常時施設情報の仮データ =====
-const MOCK_OFFICE_SERVICES: OfficeService[] = [
-  {
-    id: 1,
-    title: '証明書の発行',
-    number: '22',
-  },
-  {
-    id: 2,
-    title: '住所の変更・印鑑登録',
-    number: '57',
-  },
-  {
-    id: 3,
-    title: 'マイナンバー',
-    number: '132',
-  },
-  {
-    id: 4,
-    title: '戸籍の提出・相談',
-    number: '12',
-  },
-];
-
-export default function UserHome() {
-
-  // ===== 詳細モーダル表示状態 =====
-  const [showDetail, setShowDetail] = useState(false);
+// frontend/src/screens/UserHomeScreen.tsx
 
   // ===== BottomSheet表示状態 =====
   const [showBottomSheet, setShowBottomSheet] = useState(false);
 
+  // ---------------------------------------------------------
+  // 2. ナビゲーション・地図状態 (Navigation States)
+  // ---------------------------------------------------------
+  const [isOnline, setIsOnline] = useState(true); // ネットワーク(赤/オレンジ判定)
+  const [origin, setOrigin] = useState({
+    latitude: 34.6937,
+    longitude: 135.5023,
+  }); // 現在地
+  const [destination, setDestination] = useState<any>(null); // 避難所
+  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]); // 全経路
+  const [distanceToGoal, setDistanceToGoal] = useState<number | null>(null); // 残り距離
+  const [isArrived, setIsArrived] = useState(false); // 到着判定フラグ
+  const [heading, setHeading] = useState<number>(0); // デバイスの向き(0-359度)自分の歩いている方向が分かるようにする
+  const [nearShelters, setNearShelters] = useState<Shelter[]>([]); //ユーザーの現在地から近い順に抽出された上位3件の避難所リスト。災害モード時に、画面下部の選択カード（スワイプメニュー）に表示するデータとして使用。
+  const [selectedShelterId, setSelectedShelterId] = useState<string | null>(
+    null,
+  ); //避難所選択カードにおいて、ユーザーが現在選択している避難所のID。 カードのハイライト表示（青枠など）や、ナビゲーション目的地の決定、 および地図上のカメラ移動先を特定するために使用。初期値はnull。
+
+  // ---------------------------------------------------------
+  // 3. 外部参照・固定データ (Refs & Constants)
+  // ---------------------------------------------------------
+  const [shelters, setShelters] = useState<Shelter[]>([]);
+  const [selectedShelter, setSelectedShelter] = useState<Shelter | null>(null);
+
+  // ===== MapView参照 =====
+  const mapRef = useRef<MapView | null>(null);
+
+  // ===== 施設サービス一覧 =====
+  const [officeServices, setOfficeServices] = useState<OfficeService[]>([]);
+
+  // ===== 施設ID =====
+  const [facilityId, setFacilityId] = useState<string | null>(null);
+
+  // ===== 施設位置（市役所マーカー用） =====
+  const [facilityLocation, setFacilityLocation] = useState({
+    latitude: 34.6937,
+    longitude: 135.5023,
+  });
+
+  // タイル保存先のパス設定（オフライン地図に必須）
+  const TILE_DIR = (ExpoFileSystem as any).documentDirectory?.endsWith("/")
+    ? (ExpoFileSystem as any).documentDirectory
+    : `${(ExpoFileSystem as any).documentDirectory}/`;
+  const TILE_PATH = `${TILE_DIR}tiles/{z}/{x}/{y}.png`;
+
+  // ---------------------------------------------------------
+  // 4. 動的計算 (Computed Values) ★ ここが「先のルートだけ」の肝
+  // ---------------------------------------------------------
+  const nearestIdx = findNearestPointIndex(origin, routeCoordinates);
+  const remainingRoute =
+    nearestIdx !== -1 ? routeCoordinates.slice(nearestIdx) : routeCoordinates;
+
+  /**
+   * 目的：自分から近い上位3つの避難所を自動抽出する
+   * 発火タイミング：避難所データ(shelters)が届いた時、または現在地(origin)が動いた時
+   * 用途：災害モード時にユーザーに選択肢として提示する「避難所スワイプカード」に使用
+   */
+  useEffect(() => {
+    console.log("🔍 nearShelters計算チェック:", {
+      sheltersCount: shelters.length,
+      hasOrigin: !!origin,
+    });
+
+    if (shelters.length > 0 && origin) {
+      const sorted = shelters
+        .map((s) => ({
+          ...s,
+          distance: getDistance(
+            origin.latitude,
+            origin.longitude,
+            s.latitude,
+            s.longitude,
+          ),
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 3); // 近い順3つ
+      console.log("📍 nearShelters の中身:", sorted.length, "件"); // これが 0 だとカードは出ません
+      setNearShelters(sorted);
+    }
+  }, [shelters, origin]);
   // ===== 選択されたクイック検索 =====
   const [selectedQuickSearch, setSelectedQuickSearch] =
     useState<string | null>(null);
@@ -167,6 +211,83 @@ export default function UserHome() {
   // ===== ローディング状態 =====
   const [loading, setLoading] = useState(false);
 
+  /**
+   * 避難所リストの取得
+   * NOTE: /facilities/?type=shelter が現状 address / capacity を返さない場合、
+   * バックエンド側のレスポンスに合わせて Shelter 型・マッピングの調整が必要。
+   */
+  const fetchShelters = async () => {
+    try {
+      const url = `${API_BASE_URL}/facilities/?type=shelter`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      setShelters(data);
+    } catch (error) {
+      console.log('避難所リスト取得エラー:', error);
+    }
+  };
+
+  // ===== 施設情報を取得（市役所のfacility_idを取得） =====
+  const fetchFacilityId = async () => {
+    try {
+      const url = `${API_BASE_URL}/facilities/?type=city_hall&name=${encodeURIComponent('大阪市役所')}`;
+      console.log('Fetching:', url);
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+
+      console.log('Data received:', data);
+
+      if (data.length > 0) {
+        console.log('Setting facilityId:', data[0].facility_id);
+        setFacilityId(data[0].facility_id);
+
+        // 市役所マーカーの座標も一緒に更新
+        if (data[0].latitude && data[0].longitude) {
+          setFacilityLocation({
+            latitude: data[0].latitude,
+            longitude: data[0].longitude,
+          });
+        }
+      } else {
+        console.log('データを取得できませんでした: ', data);
+      }
+    } catch (error) {
+      console.log('施設ID取得エラー:', error);
+    }
+  };
+
+  // ===== 窓口サービス取得 =====
+  const fetchOfficeServices = async () => {
+    if (!facilityId) return;
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        `${API_BASE_URL}/facilities/${facilityId}/office-services`
+      );
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setOfficeServices(data);
+
+      setLastUpdate(
+        new Date().toLocaleTimeString('ja-JP', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+    } catch (error) {
+      console.log(error);
+      setOfficeServices([]);
+    } finally {
+      setLoading(false);
+    }
   // ===== 最終更新時刻 =====
   const [lastUpdate, setLastUpdate] = useState('');
 
@@ -253,10 +374,38 @@ export default function UserHome() {
       const response = await fetch(url);
       const data = await response.json();
 
+      const cachedPlans = await LocalDB.getAllSavedPlans();
       const list = data as Facility[];
 
       setFacilities(data);
 
+      // 2. 最適なプランを選ぶIf文ロジック
+      let bestPlan: any = null;
+      let minDistance = Infinity;
+
+      // plan に明示的に any を付けることで 'never' エラーを回避
+      cachedPlans.forEach((plan: any) => {
+        if (plan.route_data && plan.route_data.coordinates) {
+          const start = plan.route_data.coordinates[0];
+          const dist = getDistance(
+            origin.latitude,
+            origin.longitude,
+            start[1], // 緯度
+            start[0], // 経度
+          );
+
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestPlan = plan;
+          }
+        }
+      });
+
+      if (bestPlan) {
+        const points = convertGeoJsonToMapPoints(bestPlan.route_data);
+        setRouteCoordinates(points);
+        if (points.length > 0) setDestination(points[points.length - 1]);
+        console.log("✅ オフライン：最適な予備ルートを表示しました");
       if (mode === MODES.NORMAL) {
         setTimeout(() => {
           fitFacilities(list);
@@ -269,6 +418,27 @@ export default function UserHome() {
     }
   };
 
+  // ---------------------------------------------------------
+  // 6. 地図操作関数 (Map Actions)
+  // ---------------------------------------------------------
+  const moveToCityHall = () => {
+    mapRef.current?.animateToRegion(
+      {
+        latitude: facilityLocation.latitude,
+        longitude: facilityLocation.longitude,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
+      },
+      1000
+    );
+  };
+
+  /**
+   * 避難所選択時の処理：選択された避難所を目的地に設定し、Googleルートを再取得する
+   */
+  const handleSelectShelter = (shelter: Shelter) => {
+    setSelectedShelterId(shelter.shelter_id);
+    setSelectedShelter(shelter);
   // ===== API取得 =====
   const fetchOfficeServices = async (facilityId?: string) => {
     try {
@@ -283,6 +453,46 @@ export default function UserHome() {
 
       setOfficeServices(data);
 
+  // A. マウント時初期化（一度きりでよい処理）
+  useEffect(() => {
+    fetchFacilityId();
+    fetchOfficeServices();
+    fetchShelters(); // 避難所リストを取得
+    loadEvacuationPlan(); // 事前の備蓄を試みる
+  }, []);
+
+  // A-2. facilityId が取れたら、画面フォーカス時に窓口情報を取得
+  useFocusEffect(
+    useCallback(() => {
+      if (facilityId) {
+        fetchOfficeServices();
+      }
+    }, [facilityId])
+  );
+
+  // B. ネットワーク状態の監視
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const state = await Network.getNetworkStateAsync();
+      setIsOnline(!!(state.isConnected && state.isInternetReachable));
+    };
+    checkNetwork();
+  }, [mode]);
+
+  // C. 災害時の動的HUD・距離更新
+  useEffect(() => {
+    if (mode !== MODES.DISASTER || !destination || !origin) {
+      setDistanceToGoal(null);
+      return;
+    }
+
+    const dist = getDistance(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+    const roundedDist = Math.round(dist);
       // ===== 更新時間保存 =====
       setLastUpdate(
         new Date().toLocaleTimeString('ja-JP', {
@@ -298,11 +508,64 @@ export default function UserHome() {
 
     } finally {
 
+    if (roundedDist < 50 && !isArrived) {
+      setIsArrived(true);
       // ===== ローディング終了 =====
       setLoading(false);
     }
   };
 
+  // D. デバイスの向き（コンパス）監視
+  useEffect(() => {
+    let headingSubscription: any;
+
+    const startHeadingWatch = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+
+      headingSubscription = await Location.watchHeadingAsync(
+        (data: Location.LocationHeadingObject) => {
+          setHeading(data.trueHeading);
+        },
+      );
+    };
+
+    startHeadingWatch();
+
+    return () => {
+      if (headingSubscription) {
+        headingSubscription.remove();
+      }
+    };
+  }, []);
+
+  // E. 現在地の監視
+  useEffect(() => {
+    let locationSubscription: any;
+
+    const startLocationTracking = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        console.log("位置情報の権限がありません");
+        return;
+      }
+
+      locationSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 10000,
+          distanceInterval: 3,
+        },
+        (location: Location.LocationObject) => {
+          const newCoords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+          setOrigin(newCoords);
+          console.log("📍 現在地更新:", newCoords);
+        },
+      );
+    };
   // ===== 初期読み込み =====
   useEffect(() => {
     fetchOfficeServices();
@@ -315,6 +578,8 @@ export default function UserHome() {
 
     <GestureHandlerRootView style={{ flex: 1 }}>
 
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
 
         {/* ===== 地図 ===== */}
@@ -328,9 +593,46 @@ export default function UserHome() {
             latitudeDelta: 0.02,
             longitudeDelta: 0.02,
           }}
+          showsCompass={true}
+          rotateEnabled={true}
+          pitchEnabled={true}
+          scrollEnabled={true}
+          showsUserLocation={false}
+          followsUserLocation={false}
+          showsMyLocationButton={true}
+          mapPadding={{ top: 50, right: 10, bottom: 10, left: 10 }}
         >
 
           {mode === MODES.NORMAL ? (
+            // ===== 平常モード施設マーカー =====
+            <Marker
+              coordinate={facilityLocation}
+              title="大阪市役所"
+              description="公共施設"
+            />
+          ) : (
+            <>
+              {/* ① 避難ルート本体 */}
+              {remainingRoute.length > 0 && (
+                <Polyline
+                  coordinates={remainingRoute}
+                  strokeColor={isOnline ? "#ff3b30" : "#E67E22"}
+                  strokeWidth={6}
+                  zIndex={5}
+                />
+              )}
+
+              {/* ② 現在地からルート入口までの誘導点線 */}
+              {destination && (
+                <Polyline
+                  coordinates={[
+                    origin,
+                    remainingRoute[0] || destination,
+                  ]}
+                  strokeColor={isOnline ? "#007AFF" : "#FF9500"}
+                  strokeWidth={5}
+                  lineDashPattern={[6, 6]}
+                  zIndex={6}
 
             // ===== 平常モード施設マーカー =====
             <>
@@ -369,6 +671,69 @@ export default function UserHome() {
 
           ) : (
 
+              {/* ③ 現在地マーカー */}
+              <Marker
+                coordinate={origin}
+                anchor={{ x: 0.5, y: 0.5 }}
+                flat={true}
+                zIndex={10}
+              >
+                <View style={{ transform: [{ rotate: `${heading}deg` }] }}>
+                  <Ionicons name="navigate" size={32} color="#007AFF" />
+                </View>
+              </Marker>
+
+              {/* ④ [点] 周辺の避難所リスト */}
+              {/* ===== 避難所マーカー ===== */}
+              {shelters.map((shelter) => {
+                // ★ 追加：今の shelter が「目的地(destination)」と同じ座標かチェック
+                // 誤差を考慮して完全に一致するか、目的地が存在しない場合のみ描画
+                const isTarget =
+                  destination &&
+                  Math.abs(shelter.latitude - destination.latitude) < 0.0001 &&
+                  Math.abs(shelter.longitude - destination.longitude) < 0.0001;
+
+                // すでに「⑤」で描画するので、ここではスキップ（nullを返す）
+                if (isTarget) return null;
+
+                return (
+                  <Marker
+                    key={shelter.shelter_id}
+                    coordinate={{
+                      latitude: shelter.latitude,
+                      longitude: shelter.longitude,
+                    }}
+                    pinColor="red" // 目的地以外のピン
+                    title={shelter.name}
+                    onPress={() => handleSelectShelter(shelter)}
+                  >
+                    <Callout>
+                      <View style={{ padding: 5 }}>
+                        <Text style={{ fontWeight: "bold" }}>
+                          {shelter.name}
+                        </Text>
+                        <Text style={{ fontSize: 12 }}>
+                          収容人数: {shelter.capacity}人
+                        </Text>
+                      </View>
+                    </Callout>
+                  </Marker>
+                );
+              })}
+
+              {/* ⑤ ナビの目的地：最優先で表示 */}
+              {destination && (
+                <Marker
+                  key={`shelter-marker-${isOnline ? "online" : "offline"}`}
+                  coordinate={destination}
+                  // ★ 目的地は青や特別な色にすると分かりやすい（お好みで！）
+                  // pinColor={isOnline ? "#007AFF" : "#FF9500"}
+                  pinColor={isOnline ? "blue" : "orange"}
+                  title="目的地"
+                  zIndex={15}
+                  flat={false}
+                />
+              )}
             <>
               {/* ===== 現在地マーカー ===== */}
               <Marker
@@ -411,7 +776,6 @@ export default function UserHome() {
             />
           </TouchableOpacity>
 
-          {/* ===== 検索欄 ===== */}
           <View style={styles.searchContainer}>
 
             <Ionicons
@@ -420,7 +784,6 @@ export default function UserHome() {
               color="#666"
               style={styles.searchIcon}
             />
-
             <TextInput
               placeholder="検索"
               placeholderTextColor="#888"
@@ -428,7 +791,6 @@ export default function UserHome() {
             />
           </View>
 
-          {/* ===== マイページ ===== */}
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push('../my-page')}
@@ -454,11 +816,27 @@ export default function UserHome() {
                 style={[
                   styles.quickSearchButton,
                   selectedQuickSearch === item.title &&
+                    styles.activeQuickSearchButton
                   styles.activeQuickSearchButton
                 ]}
                 onPress={() => {
                   if (selectedQuickSearch === item.title) {
                     setSelectedQuickSearch(null);
+                    setShowBottomSheet(false);
+                    return;
+                  }
+
+                  setSelectedQuickSearch(item.title);
+
+                  if (item.title === '市区役所') {
+                    moveToCityHall();
+                    setShowBottomSheet(true);
+                  }
+                }}
+              >
+                <Text style={styles.quickSearchText}>
+                  {item.title}
+                </Text>
                     fetchFacilities(null);
                   } else {
                     setSelectedQuickSearch(item.title);
@@ -500,10 +878,12 @@ export default function UserHome() {
             開発環境のみ表示
           </Text>
 
-          {/* ===== 平常モードボタン ===== */}
           <TouchableOpacity
             style={[
               styles.modeButton,
+              mode === MODES.NORMAL && styles.activeModeButton
+            ]}
+            onPress={() => {
               mode === MODES.NORMAL &&
               styles.activeModeButton
             ]}
@@ -511,8 +891,6 @@ export default function UserHome() {
 
               // ===== 平常モードへ変更 =====
               setMode(MODES.NORMAL);
-
-              // ===== BottomSheet非表示 =====
               setShowBottomSheet(false);
             }}
           >
@@ -520,6 +898,7 @@ export default function UserHome() {
             <Text
               style={[
                 styles.modeText,
+                mode === MODES.NORMAL && styles.activeModeText
                 mode === MODES.NORMAL &&
                 styles.activeModeText
               ]}
@@ -529,10 +908,12 @@ export default function UserHome() {
 
           </TouchableOpacity>
 
-          {/* ===== 災害モードボタン ===== */}
           <TouchableOpacity
             style={[
               styles.modeButton,
+              mode === MODES.DISASTER && styles.activeModeButton
+            ]}
+            onPress={() => {
               mode === MODES.DISASTER &&
               styles.activeModeButton
             ]}
@@ -540,10 +921,23 @@ export default function UserHome() {
 
               // ===== 災害モードへ変更 =====
               setMode(MODES.DISASTER);
-
-              // ===== BottomSheet表示 =====
               setShowBottomSheet(true);
 
+              loadEvacuationPlan();
+
+              setTimeout(() => {
+                if (destination) {
+                  mapRef.current?.animateToRegion(
+                    {
+                      latitude: destination.latitude,
+                      longitude: destination.longitude,
+                      latitudeDelta: 0.003,
+                      longitudeDelta: 0.003,
+                    },
+                    1000
+                  );
+                }
+              }, 500);
               // ===== 避難所へ移動 =====
               mapRef.current?.animateToRegion(
                 {
@@ -562,6 +956,7 @@ export default function UserHome() {
             <Text
               style={[
                 styles.modeText,
+                mode === MODES.DISASTER && styles.activeModeText
                 mode === MODES.DISASTER &&
                 styles.activeModeText
               ]}
@@ -574,13 +969,14 @@ export default function UserHome() {
         </View>
 
         {/* ===== BottomSheet ===== */}
-        {showBottomSheet && (
+        {showBottomSheet && facilityId && (
           <HomeBottomSheet
             mode={mode}
             officeServices={officeServices}
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
+            facilityId={facilityId}
             selectedFacility={selectedFacility}
             visible={showBottomSheet}
             onClose={() => {
@@ -603,6 +999,19 @@ export default function UserHome() {
           <View style={styles.modalOverlay}>
 
             <View style={styles.detailModal}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>
+                避難所詳細情報
+              </Text>
+              <Text style={styles.modalText}>
+                現在収容人数：12人
+              </Text>
+              <Text style={styles.modalText}>
+                利用可能：毛布・水・食料
+              </Text>
+              <Text style={styles.modalText}>
+                ペット同行可能
+              </Text>
 
               {/* ===== モーダルハンドル ===== */}
               <View style={styles.modalHandle} />
@@ -630,6 +1039,9 @@ export default function UserHome() {
                 style={styles.closeButton}
                 onPress={() => setShowDetail(false)}
               >
+                <Text style={styles.closeButtonText}>
+                  閉じる
+                </Text>
 
                 <Text style={styles.closeButtonText}>
                   閉じる
@@ -644,6 +1056,7 @@ export default function UserHome() {
         </Modal>
 
       </SafeAreaView>
+    </GestureHandlerRootView>
 
     </GestureHandlerRootView>
 
@@ -662,7 +1075,7 @@ const styles = StyleSheet.create({
     height: '100%',
     position: 'absolute',
   },
-  // ヘッダー
+
   header: {
     position: 'absolute',
     top: 0,
@@ -679,16 +1092,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  //ヘッダーのicon
+
   iconButton: {
     width: 48,
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  //検索欄
+
   searchContainer: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
 
     flexDirection: 'row',
 
@@ -697,10 +1113,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
 
     borderRadius: 24,
-
     paddingHorizontal: 14,
-
     height: 48,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
 
     shadowColor: '#000',
 
@@ -711,21 +1127,21 @@ const styles = StyleSheet.create({
 
     shadowOpacity: 0.15,
     shadowRadius: 4,
-
     elevation: 4,
   },
-  //検索icon
+
   searchIcon: {
     marginRight: 8,
   },
-  //検索
+
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: '#333',
   },
-  // クイック検索アイテム
+
   quickSearchContainer: {
+    position: "absolute",
     position: 'absolute',
 
     top: 85,
@@ -735,6 +1151,7 @@ const styles = StyleSheet.create({
     padding: 6,
 
   },
+
   activeQuickSearchButton: {
     backgroundColor: '#d0d0d0',
   },
@@ -756,7 +1173,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  //下の情報欄
   bottomCard: {
     position: 'absolute',
     bottom: 0,
@@ -766,6 +1182,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     paddingBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -777,25 +1195,27 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  //施設タイトル
   cardTitle: {
     fontSize: 18,
+    fontWeight: "bold",
     fontWeight: 'bold',
 
     marginBottom: 8,
   },
-  //施設説明
+
   cardText: {
     fontSize: 15,
     color: '#555',
     lineHeight: 22,
     paddingBottom: 10,
   },
+
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -842,6 +1262,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
   },
+
   refreshButton: {
     padding: 4,
   },
@@ -852,12 +1273,14 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 10,
   },
+
   rowItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
   },
+
   usuallystatBox: {
     flex: 1,
     backgroundColor: '#eeeeee',
@@ -866,6 +1289,7 @@ const styles = StyleSheet.create({
 
 
   },
+
   usuallyTitle: {
     flex: 1,
     fontWeight: 'bold',
@@ -879,15 +1303,18 @@ const styles = StyleSheet.create({
     color: '#1976d2',
     alignSelf: 'flex-end',
   },
+
   statBox: {
     flex: 1,
     backgroundColor: '#FFEE37',
     padding: 12,
     borderRadius: 12,
     height: 140,
+    position: "relative",
 
     position: 'relative',
   },
+
   statBox2: {
     flex: 1,
     backgroundColor: '#D9D9D9',
@@ -895,21 +1322,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+
   statValueLeft: {
     position: 'absolute',
     bottom: 10,
     left: 13,
-
     fontSize: 30,
     fontWeight: 'bold',
     color: '#000000',
   },
-  //移動中・収容されるテキスト
+
   statTitle: {
     position: 'absolute',
     top: 10,
     left: 10,
     right: 0,
+    fontWeight: "bold",
     fontWeight: 'bold',
 
     fontSize: 18,
@@ -920,11 +1348,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     left: 10,
-
     fontSize: 29,
     fontWeight: 'bold',
     color: '#1976d2',
   },
+
   statImage: {
     position: 'absolute',
     bottom: 8,
@@ -985,9 +1413,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // モード切替
-  // 開発環境のみ表示　start
   modeContainer: {
+    position: "absolute",
+    top: 180,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    backgroundColor: "white",
     position: 'absolute',
 
     top: 180,
@@ -999,20 +1431,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
 
     borderRadius: 16,
-
     padding: 6,
-
     gap: 8,
-
     elevation: 4,
   },
 
   modeButton: {
     flex: 1,
-
     paddingVertical: 1,
-
     borderRadius: 12,
+    alignItems: "center",
 
     alignItems: 'center',
   },
@@ -1023,6 +1451,170 @@ const styles = StyleSheet.create({
 
   modeText: {
     fontSize: 15,
+    fontWeight: "600",
+    color: "#8f8c8c",
+  },
+
+  activeModeText: {
+    color: "white",
+  },
+
+  navInfoPanel: {
+    position: "absolute",
+    top: 250,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    padding: 12,
+    borderRadius: 16,
+    alignItems: "center",
+    minWidth: 120,
+    elevation: 5,
+  },
+
+  navLabel: {
+    color: "#ccc",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+
+  distanceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+
+  navDistance: {
+    color: "#FFEE37",
+    fontSize: 32,
+    fontWeight: "bold",
+  },
+
+  unitText: {
+    color: "#FFEE37",
+    fontSize: 14,
+    marginLeft: 4,
+    fontWeight: "600",
+  },
+
+  arrivalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+
+  arrivalCard: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 30,
+    alignItems: "center",
+    elevation: 10,
+  },
+
+  arrivalTitle: { fontSize: 20, fontWeight: "bold", marginVertical: 10 },
+  arrivalSub: { fontSize: 14, color: "#666", marginBottom: 20 },
+
+  qrButton: {
+    backgroundColor: "#FFEE37",
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+  },
+
+  qrButtonText: { fontWeight: "bold", fontSize: 16 },
+  shelterSelectorWrapper: {
+    position: "absolute",
+    bottom: 300, // HomeBottomSheet(snapPoints)の上に乗る位置
+    left: 0,
+    right: 0,
+    alignItems: "center", // 中央寄せ
+    zIndex: 100,
+  },
+  selectorTitle: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+    alignSelf: "flex-start", // タイトルは左寄せ
+    marginLeft: 20,
+    marginBottom: 8,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 5,
+  },
+  // 選択後に表示されるスリムなボタン
+  changeShelterButton: {
+    backgroundColor: "white",
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+    alignItems: "center",
+    gap: 8,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    marginBottom: 20, // 少し上に浮かせる
+  },
+  changeBtnText: {
+    color: "#007AFF",
+    fontWeight: "bold",
+    fontSize: 15,
+  },
+  shelterCard: {
+    width: 260,
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 15,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  selectedShelterCard: {
+    borderColor: "#007AFF",
+    backgroundColor: "#f0f7ff",
+  },
+  shelterCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  shelterCardName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  shelterCardSub: {
+    fontSize: 12,
+    color: "#777",
+    marginBottom: 8,
+  },
+  shelterCardTags: {
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: 8,
+  },
+  tag: {
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  tagText: {
+    fontSize: 10,
+    color: "#666",
+  },
+  selectBtnText: {
+    fontSize: 12,
+    color: "#007AFF",
+    fontWeight: "bold",
+    textAlign: "right",
     fontWeight: '600',
 
     color: '#8f8c8c',

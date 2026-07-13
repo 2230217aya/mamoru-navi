@@ -9,16 +9,16 @@ import {
 } from 'react-native';
 
 type Props = {
-  receiptNumber?: number;
-  waitMinutes?: number;
+  issuedNumber?: number;
+  estimatedWaitMinutes?: number;
   serviceName?: string;
   onShowQR?: () => void;
   onGoHome?: () => void;
 };
 
 export default function ReservationCompleteScreen({
-  receiptNumber = 169,
-  waitMinutes = 50,
+  issuedNumber,
+  estimatedWaitMinutes,
   serviceName,
   onShowQR,
   onGoHome,
@@ -42,14 +42,14 @@ export default function ReservationCompleteScreen({
         <Text style={styles.cardLabel}>受付番号</Text>
 
         <Text style={styles.receiptNumber}>
-          {String(receiptNumber)
+          {String(issuedNumber)
             .split('')
             .join('\u2002')}
           番
         </Text>
 
         <Text style={styles.waitText}>
-          待ち時間の目安：約{waitMinutes}分
+          待ち時間の目安：約{estimatedWaitMinutes}分
         </Text>
 
         {serviceName && (
@@ -70,7 +70,6 @@ export default function ReservationCompleteScreen({
         onPress={onShowQR}
         activeOpacity={0.85}
       >
-        
         <Text style={styles.qrButtonText}>マイQRコード</Text>
       </TouchableOpacity>
 
