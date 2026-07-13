@@ -50,7 +50,7 @@ type Props = {
   selectedFacility: Facility | null;
   visible: boolean;
   onClose: () => void;
-  selectedShelter: Shelter | null;
+  selectedShelter?: Shelter | null;
 };
 
 const MODES = {
