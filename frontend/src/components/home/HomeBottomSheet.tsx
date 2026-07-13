@@ -1,7 +1,7 @@
 // frontend\src\components\home\HomeBottomSheet.tsx
 
 // ===== React =====
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
 // ===== BottomSheet =====
 import BottomSheet, {
@@ -16,14 +16,7 @@ import { Image, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import NormalModeContent from "./NormalModeContent";
 import DisasterModeContent from "./DisasterModeContent";
 
-type Facility = {
-  facility_id: string;
-  name: string;
-  type: string;
-  latitude: number;
-  longitude: number;
-};
-
+// ===== Types =====
 type OfficeService = {
   id: number;
   title: string;
@@ -37,8 +30,8 @@ type Shelter = {
   latitude: number;
   longitude: number;
   capacity: number;
-  toilet_count?: number;
-  supplies?: string[];
+  toilet_count?: number; // あなたが追加したフィールド
+  supplies?: string[]; // あなたが追加したフィールド
 };
 
 type Props = {
@@ -46,11 +39,8 @@ type Props = {
   officeServices: OfficeService[];
   loading: boolean;
   lastUpdate: string;
-  onRefresh: (facilityId: string) => void;
-  selectedFacility: Facility | null;
-  visible: boolean;
-  onClose: () => void;
-  selectedShelter?: Shelter | null;
+  onRefresh: () => void;
+  selectedShelter: Shelter | null;
 };
 
 const MODES = {
@@ -64,48 +54,46 @@ export default function HomeBottomSheet({
   loading,
   lastUpdate,
   onRefresh,
-  selectedFacility,
-  visible,
-  onClose,
   selectedShelter,
 }: Props) {
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const [sheetIndex, setSheetIndex] = useState(0);
+
   const snapPoints = useMemo(() => {
-    return mode === MODES.NORMAL ? ["16%", "47%"] : ["33%", "88%"];
+    if (mode === MODES.NORMAL) {
+      return ["16%", "47%"];
+    }
+    return ["33%", "88%"];
   }, [mode]);
-
-  const sheetRef = useRef<BottomSheet>(null);
-
-  const index = !visible ? -1 : 0;
-
-  useEffect(() => {
-    if (!selectedFacility?.facility_id) return;
-    onRefresh(selectedFacility.facility_id);
-  }, [selectedFacility]);
-
-  const title =
-    mode === MODES.NORMAL
-      ? selectedFacility?.name ?? "大阪市役所"
-      : selectedShelter?.name ?? "避難所を選択してください";
 
   return (
     <>
       {/* ===== BottomSheet ===== */}
       <BottomSheet
-        ref={sheetRef}
-        index={index}
+        ref={bottomSheetRef}
+        index={0}
+        onChange={setSheetIndex}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
-        enablePanDownToClose={mode === MODES.NORMAL}
-        onClose={onClose}
         backgroundStyle={{
           backgroundColor: "#fff",
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
         }}
+        handleIndicatorStyle={{
+          backgroundColor: "#ccc",
+          width: 60,
+        }}
       >
         <BottomSheetView style={styles.container}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.title}>
+              {mode === MODES.NORMAL
+                ? "大阪市役所"
+                : selectedShelter
+                  ? selectedShelter.name
+                  : "避難所を選択してください"}
+            </Text>
 
             {mode === MODES.NORMAL && (
               <TouchableOpacity
@@ -125,15 +113,13 @@ export default function HomeBottomSheet({
               officeServices={officeServices}
               loading={loading}
               lastUpdate={lastUpdate}
-              onRefresh={() =>
-                selectedFacility?.facility_id &&
-                onRefresh(selectedFacility.facility_id)
-              }
+              onRefresh={onRefresh}
             />
           ) : (
             /* ========================= */
             /* DISASTER MODE */
             /* ========================= */
+
             <BottomSheetScrollView
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
@@ -147,9 +133,7 @@ export default function HomeBottomSheet({
         </BottomSheetView>
       </BottomSheet>
 
-      {/* ========================= */}
-      {/* DISASTER MODE STATS PANEL */}
-      {/* ========================= */}
+      {/* 災害時の統計パネル連動 */}
       {mode === MODES.DISASTER && (
         <View style={styles.fixedStatsContainer}>
           <View style={styles.statBox}>
@@ -178,6 +162,7 @@ export default function HomeBottomSheet({
     </>
   );
 }
+
 // ===== Style =====
 const styles = StyleSheet.create({
   container: {
@@ -188,12 +173,12 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
 
@@ -254,17 +239,16 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
   },
-  // ===== 予約ボタン =====
   reserveButton: {
-    backgroundColor: '#FFEE37',
+    backgroundColor: "#FFEE37",
     paddingHorizontal: 30,
     paddingVertical: 8,
     borderRadius: 20,
   },
 
   reserveButtonText: {
-    color: '#000',
+    color: "#000",
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
