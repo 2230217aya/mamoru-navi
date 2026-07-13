@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { LocalDB } from "@/src/db/database";
 import * as Crypto from "expo-crypto";
 import Constants from "expo-constants";
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api"; // ★ APIのベースURLを取得するユーティリティ関数をインポート
 
 export default function IDScanScreen() {
   const router = useRouter();
@@ -68,15 +69,7 @@ export default function IDScanScreen() {
 
       if (!photo) throw new Error("写真の撮影に失敗しました");
 
-      // --- 2. API接続先の決定 (ここを維持) ---
-      const debuggerHost = Constants.expoConfig?.hostUri;
-      const localIp = debuggerHost ? debuggerHost.split(":")[0] : "localhost";
-
-      const baseUrl =
-        process.env.EXPO_PUBLIC_API_URL ||
-        (localIp === "localhost" || localIp === "127.0.0.1"
-          ? "http://localhost:8000"
-          : `http://${localIp}:8000`);
+      const baseUrl = getBaseUrl(); // 共通ユーティリティからベースURLを取得
 
       console.log(`📡 [Scan] 接続先: ${baseUrl}/scan/qr-code`);
 

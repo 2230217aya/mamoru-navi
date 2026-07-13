@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db_connection, get_db
+from database_utils import seed_shelters
 from config import OLD_LOCATION_STALE_MINUTES
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -12,6 +13,7 @@ import uuid
 import time
 import json
 from contextlib import asynccontextmanager
+from typing import List, Optional
 
 # --- ルーターのインポート（すべて集約） ---
 from routers import (
@@ -34,6 +36,8 @@ class ShelterCreate(BaseModel):
     latitude: float
     longitude: float
     capacity: Optional[int] = None
+    toilet_count: int = 0  
+    supplies: List[str] = [] 
 
 
 
@@ -88,6 +92,9 @@ async def lifespan(app: FastAPI):
             cur.close()
             conn.close()
             print("✅ データベースの初期設定が完了しました。")
+
+            print("💾 避難所データの同期(Seeding)を開始します...")
+            seed_shelters() 
         except Exception as e:
             print(f"❌ DB初期化中にエラー発生: {e}")
     
@@ -276,6 +283,7 @@ def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       toilet_count, supplies, -- ★追加
                        ABS(latitude - %s) + ABS(longitude - %s) AS distance
                 FROM shelters
                 ORDER BY distance ASC
@@ -292,10 +300,13 @@ def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
                     "latitude": s[3],
                     "longitude": s[4],
                     "capacity": s[5],
-                    "distance": round(s[6], 6),
+                    "toilet_count": s[6], # 
+                    "supplies": s[7],     
+                    "distance": round(s[8], 6), # インデックスが8に変更される
                 }
                 for s in shelters
             ]
+
  
 @app.get("/shelters/search", summary="シェルターを名前または容量で検索")
 def search_shelters(q: Optional[str] = None, capacity: Optional[int] = None):
@@ -406,7 +417,8 @@ def get_shelter(shelter_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT shelter_id, name, address, latitude, longitude, capacity
+                SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       toilet_count, supplies -- ★追加
                 FROM shelters WHERE shelter_id = %s
             """, (shelter_id,))
             s = cur.fetchone()
@@ -419,14 +431,18 @@ def get_shelter(shelter_id: str):
                 "latitude": s[3],
                 "longitude": s[4],
                 "capacity": s[5],
+                "toilet_count": s[6],
+                "supplies": s[7],    
             }
+
  
 @app.get("/shelters/", summary="すべてのシェルターを取得")
 def get_shelters():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT shelter_id, name, address, latitude, longitude, capacity
+                SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       toilet_count, supplies -- ★追加
                 FROM shelters ORDER BY name
             """)
             shelters = cur.fetchall()
@@ -438,10 +454,11 @@ def get_shelters():
                     "latitude": s[3],
                     "longitude": s[4],
                     "capacity": s[5],
+                    "toilet_count": s[6], 
+                    "supplies": s[7],    
                 }
                 for s in shelters
             ]
- 
  
 # ===== MAP =====
  

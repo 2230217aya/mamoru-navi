@@ -7,21 +7,9 @@ CREATE TABLE IF NOT EXISTS shelters (
     address TEXT NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
-    capacity INTEGER,
+    capacity INTEGER,                -- 最大収容人数
+    toilet_count INTEGER DEFAULT 0,  -- ★追加：トイレの数
+    supplies TEXT[] DEFAULT '{}',    -- ★追加：備蓄物資リスト（文字列の配列）
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_at TIMESTAMP
 );
-
-
--- 【テスト避難所：中央市民体育館】
-
-INSERT INTO shelters (
-    shelter_id, name, address, latitude, longitude, capacity
-) VALUES (
-    '11111111-1111-1111-1111-111111111111',
-    '中央市民体育館（避難所）',
-    '大阪市北区中崎西2丁目3-35',
-    34.7056,
-    135.5063,
-    500
-) ON CONFLICT (shelter_id) DO NOTHING;
