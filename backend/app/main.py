@@ -2,31 +2,47 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from database import get_db
+from database import get_db_connection, get_db
+from database_utils import seed_shelters
 from config import OLD_LOCATION_STALE_MINUTES
+from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
+import psycopg2
+import psycopg2.extras
+import uuid
+import time
+import json
+from contextlib import asynccontextmanager
+from typing import List, Optional
 
-from routers import users
-from routers import scan
-from routers import checkins
-from routers import notifications
-from routers import reservations
-from routers import danger_area
-from routers import congestion
-from routers import facilities
+# --- ルーターのインポート（すべて集約） ---
+from routers import (
+    users, scan, checkins, notifications, 
+    reservations, danger_area, congestion, facilities
+)
 
-app = FastAPI()
 
-app.include_router(users.router)
-app.include_router(scan.router)
-app.include_router(checkins.router)
-app.include_router(notifications.router)
-app.include_router(reservations.router)
-app.include_router(danger_area.router)
-app.include_router(congestion.router)
-app.include_router(facilities.router)
+# ==========================================
+# 1. リクエストモデル & ユーティリティ
+# ==========================================
+class LocationRequest(BaseModel):
+    user_id: str
+    latitude: float
+    longitude: float
+
+class ShelterCreate(BaseModel):
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    capacity: Optional[int] = None
+    toilet_count: int = 0  
+    supplies: List[str] = [] 
+
+
 
 # ===== HELPERS =====
- 
+ # --- 2. ユーティリティ ---
 def convert_crowd_level(current_user_count: int, capacity: int):
     if capacity is None or capacity <= 0:
         return None, "unknown"
@@ -41,23 +57,82 @@ def convert_crowd_level(current_user_count: int, capacity: int):
         crowd_level = "満員"
     return round(crowd_rate, 2), crowd_level
  
- 
-# ===== SCHEMA =====
- 
-class LocationRequest(BaseModel):
-    user_id: str
-    latitude: float
-    longitude: float
- 
-class ShelterCreate(BaseModel):
-    name: str
-    address: str
-    latitude: float
-    longitude: float
-    capacity: Optional[int] = None
 
-# ===== ROOT =====
- 
+# ==========================================
+# 3. Lifespan (起動・終了時処理) の定義
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🚀 アプリケーション起動シーケンス開始...")
+    
+    # データベース接続リトライロジック
+    conn = None
+    retry_count = 5
+    while retry_count > 0:
+        try:
+            conn = get_db_connection()
+            print("✅ データベースに接続できました。")
+            break
+        except Exception as e:
+            print(f"⚠️ DB接続待ち... 残り {retry_count} 回: {e}")
+            retry_count -= 1
+            time.sleep(2)
+
+    if conn:
+        try:
+            cur = conn.cursor()
+            print("🛠️ データベースの初期設定を確認中...")
+            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+            # pgrouting はインストールされていない環境が多いので失敗してもスキップするようにする
+            try:
+                cur.execute("CREATE EXTENSION IF NOT EXISTS pgrouting;")
+            except:
+                print("ℹ️ pgrouting extension is not available. Skipping.")
+            conn.commit()
+            cur.close()
+            conn.close()
+            print("✅ データベースの初期設定が完了しました。")
+
+            print("💾 避難所データの同期(Seeding)を開始します...")
+            seed_shelters() 
+        except Exception as e:
+            print(f"❌ DB初期化中にエラー発生: {e}")
+    
+    yield  # ここでAPIの受付が始まる
+    print("🛑 アプリケーション終了")
+
+# ==========================================
+# 4. FastAPIインスタンスの生成 (唯一のapp)
+# ==========================================
+app = FastAPI(lifespan=lifespan)
+
+# ==========================================
+# 5. ミドルウェア設定 (唯一のappに対して)
+# ==========================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # 開発時は "*"、本番は特定のURL
+    allow_credentials=True,
+    allow_methods=["*"], # 全メソッド許可
+    allow_headers=["*"],
+)
+
+
+# --- 6. ルーターの登録 (インスタンス生成後に行う) ---
+app.include_router(users.router)
+app.include_router(scan.router)
+app.include_router(checkins.router)
+app.include_router(notifications.router)
+app.include_router(reservations.router)
+app.include_router(danger_area.router)
+app.include_router(congestion.router)
+app.include_router(facilities.router)
+
+# ==========================================
+# 7. エンドポイント定義
+# ==========================================
+
+
 @app.get("/")
 def read_root():
     return {"message": "まもるナビ APIへようこそ！"}
@@ -208,6 +283,7 @@ def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       toilet_count, supplies, -- ★追加
                        ABS(latitude - %s) + ABS(longitude - %s) AS distance
                 FROM shelters
                 ORDER BY distance ASC
@@ -224,10 +300,13 @@ def get_nearest_shelters(lat: float, lng: float, limit: int = 5):
                     "latitude": s[3],
                     "longitude": s[4],
                     "capacity": s[5],
-                    "distance": round(s[6], 6),
+                    "toilet_count": s[6], # 
+                    "supplies": s[7],     
+                    "distance": round(s[8], 6), # インデックスが8に変更される
                 }
                 for s in shelters
             ]
+
  
 @app.get("/shelters/search", summary="シェルターを名前または容量で検索")
 def search_shelters(q: Optional[str] = None, capacity: Optional[int] = None):
@@ -338,7 +417,8 @@ def get_shelter(shelter_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT shelter_id, name, address, latitude, longitude, capacity
+                SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       toilet_count, supplies -- ★追加
                 FROM shelters WHERE shelter_id = %s
             """, (shelter_id,))
             s = cur.fetchone()
@@ -351,14 +431,18 @@ def get_shelter(shelter_id: str):
                 "latitude": s[3],
                 "longitude": s[4],
                 "capacity": s[5],
+                "toilet_count": s[6],
+                "supplies": s[7],    
             }
+
  
 @app.get("/shelters/", summary="すべてのシェルターを取得")
 def get_shelters():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT shelter_id, name, address, latitude, longitude, capacity
+                SELECT shelter_id, name, address, latitude, longitude, capacity,
+                       toilet_count, supplies -- ★追加
                 FROM shelters ORDER BY name
             """)
             shelters = cur.fetchall()
@@ -370,10 +454,11 @@ def get_shelters():
                     "latitude": s[3],
                     "longitude": s[4],
                     "capacity": s[5],
+                    "toilet_count": s[6], 
+                    "supplies": s[7],    
                 }
                 for s in shelters
             ]
- 
  
 # ===== MAP =====
  
@@ -415,9 +500,10 @@ def get_map():
                 ],
             }
  
+# --- 1. タップされた位置情報の取得 (main側の新しい実装を採用) ---
 @app.get("/map/location-info", summary="タップされた位置情報の取得")
 def get_location_info(lat: float, lng: float):
-    with get_db() as conn:
+    with get_db_connection() as conn: # メソッド名に注意
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT shelter_id, name, address, latitude, longitude, capacity
@@ -458,10 +544,98 @@ def get_location_info(lat: float, lng: float):
                     for a in danger_areas
                 ],
             }
- 
+
+# --- 2. 経路計算API (HEAD側の苦労した機能をそのままキープ) ---
+@app.get("/map/my-plan/{user_id}")
+def get_my_evacuation_plan(user_id: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        import psycopg2.extras
+        import json
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # 1. ユーザー位置取得
+        cur.execute("SELECT ST_X(location::geometry) as lon, ST_Y(location::geometry) as lat FROM user_locations WHERE user_id = %s ORDER BY recorded_at DESC LIMIT 1;", (user_id,))
+        u_loc = cur.fetchone()
+        
+        # 位置がない場合のフォールバック（エラーで止めない）
+        u_lon = u_loc['lon'] if u_loc else 135.4950
+        u_lat = u_loc['lat'] if u_loc else 34.7024
+
+        # 2. ノード検索と最寄り避難所 (KNN検索)
+        cur.execute("""
+            WITH target_shelter AS (
+                SELECT shelter_id, name, latitude, longitude,
+                       ST_SetSRID(ST_Point(longitude, latitude), 4326) as shelter_geom
+                FROM shelters
+                ORDER BY ST_SetSRID(ST_Point(longitude, latitude), 4326) <-> ST_SetSRID(ST_Point(%s, %s), 4326)
+                LIMIT 1
+            )
+            SELECT 
+                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> ST_SetSRID(ST_Point(%s, %s), 4326) LIMIT 1) as start_node,
+                (SELECT id FROM ways_vertices_pgr ORDER BY the_geom <-> (SELECT shelter_geom FROM target_shelter) LIMIT 1) as end_node,
+                s.*
+            FROM target_shelter s;
+        """, (u_lon, u_lat, u_lon, u_lat))
+        points = cur.fetchone()
+
+        if not points or not points['start_node'] or not points['end_node']:
+             raise HTTPException(status_code=404, detail="経路計算の基点が見つかりません。道路データを確認してください。")
+
+        # 3. pgr_dijkstra 実行 
+        # ★ 修正ポイント: cost_s が存在しない場合が多いため 'length' または 'cost' に修正
+        cur.execute("""
+            SELECT ST_AsGeoJSON(ST_Transform(ST_MakeLine(res.the_geom), 4326)) as geojson
+            FROM (
+                SELECT w.the_geom
+                FROM pgr_dijkstra(
+                    'SELECT gid as id, source, target, length as cost FROM ways WHERE source IS NOT NULL AND target IS NOT NULL',
+                    %s, %s, directed := false
+                ) AS di
+                JOIN ways AS w ON di.edge = w.gid
+                ORDER BY di.seq
+            ) AS res;
+        """, (points['start_node'], points['end_node']))
+        
+        route_result = cur.fetchone()
+
+        # ★ 修正ポイント: route_result['geojson'] ではなく route_result.get('geojson') で安全に取得
+        geojson_str = route_result['geojson'] if (route_result and route_result.get('geojson')) else None
+
+        if geojson_str:
+            route_data = json.loads(geojson_str)
+        else:
+            # 経路が見つからなかった時の直線フォールバック
+            route_data = {
+                "type": "LineString", 
+                "coordinates": [[u_lon, u_lat], [float(points['longitude']), float(points['latitude'])]]
+            }
+
+        return {
+            "status": "success",
+            "plan": {
+                "plan_id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "primary_shelter_id": str(points['shelter_id']),
+                "route_data": route_data,
+                "meeting_point_name": points['name'],
+                "meeting_point_lat": float(points['latitude']),
+                "meeting_point_lon": float(points['longitude']),
+                "updated_at": datetime.now().isoformat()
+            }
+        }
+    except Exception as e:
+        # 詳細をログに出して、クライアントにはエラーメッセージを返す
+        print(f"❌ Route Engine Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"経路計算失敗: {str(e)}")
+    finally:
+        if conn: conn.close()
+
+# --- 3. オフライン用データAPI (main側にあるのでキープ) ---
 @app.get("/offline/map-data", summary="オフライン用マップデータを取得")
 def get_offline_map_data():
-    with get_db() as conn:
+    with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT shelter_id, name, address, latitude, longitude, capacity, updated_at

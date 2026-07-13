@@ -1,5 +1,4 @@
-//userhomes
-
+//frontend\src\screens\UserHomeScreen.tsx
 // ===== アイコン =====
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,13 +11,16 @@ import { router } from 'expo-router';
 // ===== BottomSheet =====
 import HomeBottomSheet from '../components/home/HomeBottomSheet';
 
+import Constants from "expo-constants";
+
 // ===== Reanimated =====
 import 'react-native-reanimated';
 
 // ===== Gesture Handler =====
-import {
-  GestureHandlerRootView,
-} from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
+// タイル保存先確認用
+import * as ExpoFileSystem from "expo-file-system";
 
 // ===== React Native =====
 import {
@@ -34,15 +36,32 @@ import {
 } from 'react-native';
 
 // ===== React =====
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from "react";
 
 // ===== 災害警報バナー =====
-import EmergencyAlertBanner
-  from '../components/home/EmergencyAlertBanner';
+import EmergencyAlertBanner from "../components/home/EmergencyAlertBanner";
+
+// --- SQLite ---
+import { LocalDB } from "@/src/db/database";
+import {
+  convertGeoJsonToMapPoints,
+  findNearestPointIndex,
+  getDistance,
+  decodeGooglePolyline,
+} from "@/src/utils/mapUtils";
+
+// ===== ネットワーク状態 =====
+import * as Network from "expo-network";
+
+// ===== baseAPIまとめ =====
+import { getBaseUrl, API_HEADERS } from "@/src/utils/api";
+
+// watchHeadingAsync のために必要
+import * as Location from "expo-location";
+
 
 const API_BASE_URL = "http://192.168.137.1:8000";
 const API_URL = API_BASE_URL;
-
 
 // ===== モード定義 =====
 const MODES = {
@@ -56,6 +75,16 @@ type OfficeService = {
   title: string;
   number: string;
 };
+
+type Shelter = {
+  shelter_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
+};
+
 type Facility = {
   facility_id: string;
   name: string;

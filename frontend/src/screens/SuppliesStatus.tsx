@@ -83,7 +83,7 @@ export default function suppliesStatus() {
     return(
         <View style={styles.container}>
             <View style={styles.header}>
-                <Pressable onPress={() => router.push("/")}>
+                <Pressable onPress={() => router.push("/supplies-management")}>
                     <Text style={styles.supplyStatus}>物資状況＞</Text>
                 </Pressable>
                 {/* 現在時刻取得 */}

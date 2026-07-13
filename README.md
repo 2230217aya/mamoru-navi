@@ -264,3 +264,65 @@ docker-compose exec frontend npx expo start --tunnel
 - [ ] Windows ファイアウォールが OFF になっているか？（特にパブリックネットワーク）
 - [ ] （パターンAの場合）スマホが PC のホットスポットに接続されているか？
 - [ ] （パターンBの場合）localtunnel コマンドを起動し続けているか？
+
+🗺️ まもるナビ：オフライン地図・道路インフラ構築仕様
+
+1. 概要 (The Outcome)
+
+本プロジェクトでは、大阪市の詳細な道路ネットワーク（約31万本）をPostgreSQL/PostGIS内に構築し、pgRoutingによる実走行最短経路の算出を可能にしました。
+
+- 総道路数: 317,053 (ways)
+- 総交差点数: 40,570 (ways_vertices_pgr)
+- 計算エンジン: pgRouting (pgr_dijkstra)
+
+2. 開発環境での再現方法 (Steps for Others)
+
+他の開発者がこの環境を構築するための手順は、docker-composeによって完全に自動化されています。
+
+① 前準備：生データのダウンロード
+
+巨大な生データ(.osm.pbf)はGitに含めないため、手動で1回だけダウンロードが必要です。
+
+1.  Geofabrik - Kinki Region から kinki-latest.osm.pbf をダウンロード。
+2.  プロジェクトのルートフォルダに kansai-260621.osm.pbf として配置。(docker-compose.ymlと同じ場所)
+
+② 自動構築の実行
+
+以下のコマンドを実行します。
+
+docker-compose down -v
+docker-compose up -d --build
+
+【裏側で行われている自動処理】: dbコンテナの起動後、osm_importerコンテナが以下のinit-osm.shを順次実行します。
+
+1.  接続待機: dbコンテナがHealthcheck OKになるまで待機。
+2.  エリア抽出: メモリ節約のため osmconvert を使い、大阪駅を中心とした指定座標範囲を .osm 形式で切り出し。
+3.  インポート: osm2pgrouting を実行し、道路・交差点テーブルを生成。
+4.  トポロジー生成: pgr_createTopology を走り、道路同士の論理的な「接続」を確立（これにより経路計算が可能になる）。
+
+5.  分析：なぜ以前は失敗し、今回は成功したか (Lessons Learned)
+
+6.  チームメンバーへの指示 (Action for Developers)
+
+7.  Gitの db/ ディレクトリ配下を確認: init-osm.sh と Dockerfile が正しくマージされていること。
+8.  .gitignore の確認: \*.osm.pbf や /tmp/workdir が含まれていること（巨大ファイルをGitに上げないため）。
+9.  動作確認コマンド:
+    # 経路計算ができるか確認 (返却行数が 0 でなければOK)
+    docker exec -it mamoru-navi-db-1 psql -U user -d mamoru_navi_db -c "SELECT seq, node, edge, cost FROM pgr_dijkstra('SELECT gid as id, source, target, length as cost FROM ways', (SELECT source FROM ways LIMIT 1), (SELECT target FROM ways ORDER BY gid DESC LIMIT 1), directed := false) LIMIT 10;"
+
+## 外部APIの利用 (Google Maps API)
+
+本プロジェクトでは、災害モード時の高精度なルート案内を実現するためにGoogle Maps Platformを利用しています。
+
+### 利用サービス
+
+- **Directions API**: 現在地から避難所までの最適な歩行ルート（座標列）を取得するために使用。
+- **Polyline Algorithm**: サーバーから返却される圧縮されたルートデータをデコードし、地図上に描画。
+
+### 環境構築
+
+フロントエンドのルートディレクトリにある `.env` ファイルに以下のキーを設定してください。
+
+```txt
+EXPO_PUBLIC_GOOGLE_API_KEY=あなたのGoogle_API_キー
+```
