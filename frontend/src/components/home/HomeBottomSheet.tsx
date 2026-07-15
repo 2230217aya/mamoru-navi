@@ -53,6 +53,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   selectedShelter?: Shelter | null;
+  onSheetIndexChange?: (index: number) => void;
 };
 
 const MODES = {
@@ -70,9 +71,14 @@ export default function HomeBottomSheet({
   visible,
   onClose,
   selectedShelter,
+   onSheetIndexChange,
 }: Props) {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [sheetIndex, setSheetIndex] = useState(0);
+   const handleSheetChange = (index: number) => {
+    setSheetIndex(index);
+    onSheetIndexChange?.(index); 
+  };
 
   const snapPoints = useMemo(() => {
     if (mode === MODES.NORMAL) {
@@ -81,6 +87,8 @@ export default function HomeBottomSheet({
     return ["33%", "88%"];
   }, [mode]);
 
+   // 災害モードでまだ避難所を選んでいない時は、シート操作を無効化する
+  const isShelterUnselected = mode === MODES.DISASTER && !selectedShelter;
   const sheetRef = useRef<BottomSheet>(null);
 
   const index = !visible ? -1 : 0;
@@ -100,8 +108,8 @@ export default function HomeBottomSheet({
       {/* ===== BottomSheet ===== */}
       <BottomSheet
         ref={bottomSheetRef}
-        index={0}
-        onChange={setSheetIndex}
+        index={isShelterUnselected ? 0 : sheetIndex}
+        onChange={handleSheetChange}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
         backgroundStyle={{
@@ -160,7 +168,7 @@ export default function HomeBottomSheet({
       </BottomSheet>
 
       {/* 災害時の統計パネル連動 */}
-      {mode === MODES.DISASTER && (
+      {mode === MODES.DISASTER && selectedShelter && (
         <View style={styles.fixedStatsContainer}>
           <View style={styles.statBox}>
             <Text style={styles.statTitle}>移動中</Text>

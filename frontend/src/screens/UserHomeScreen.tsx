@@ -180,7 +180,7 @@ export default function UserHome() {
   const [selectedShelterId, setSelectedShelterId] = useState<string | null>(
     null,
   ); //避難所選択カードにおいて、ユーザーが現在選択している避難所のID。 カードのハイライト表示（青枠など）や、ナビゲーション目的地の決定、 および地図上のカメラ移動先を特定するために使用。初期値はnull。
-
+  const [bottomSheetIndex, setBottomSheetIndex] = useState(0);
   // ---------------------------------------------------------
   // 3. 外部参照・固定データ (Refs & Constants)
   // ---------------------------------------------------------
@@ -275,6 +275,7 @@ export default function UserHome() {
     }
   };
 
+  
  /**
    * 施設の現在の受付状況の取得
    */
@@ -513,6 +514,7 @@ export default function UserHome() {
 
   // A. マウント時初期化
   useEffect(() => {
+    fetchFacilities(null); 
     fetchOfficeServices();
     fetchShelters(); // 避難所リストを取得
     loadEvacuationPlan(); // 事前の備蓄を試みる
@@ -955,6 +957,9 @@ export default function UserHome() {
 
               // ===== BottomSheet非表示 =====
               setShowBottomSheet(false);
+              setSelectedFacility(null);
+              setSelectedQuickSearch(null);
+              fetchFacilities(null); // 施設情報を取得
             }}
           >
             <Text
@@ -1014,13 +1019,16 @@ export default function UserHome() {
 
         {/* 災害時オンライン用の避難所選択リスト */}
         {mode === MODES.DISASTER && isOnline && nearShelters.length > 0 && (
-          <View style={styles.shelterSelectorWrapper}>
+          <View style={[
+            styles.shelterSelectorWrapper,
+            selectedShelterId && styles.shelterSelectorWrapperSelected,
+          ]}>
             {/* ★ 変更ポイント：未選択 (!selectedShelterId) の時だけカードを出す */}
             {!selectedShelterId ? (
               <>
-                <Text style={styles.selectorTitle}>
+                {/* <Text style={styles.selectorTitle}>
                   避難所を選択してください
-                </Text>
+                </Text> */}
                 <View style={{ height: 150 }}>
                   <Animated.ScrollView
                     horizontal
@@ -1060,7 +1068,8 @@ export default function UserHome() {
                 </View>
               </>
             ) : (
-              // ★ 変更ポイント：避難所が「選択済み」の時は、画面をスッキリさせるためにボタン1つにする
+              bottomSheetIndex === 0 &&
+              // 避難所が「選択済み」の時は、画面をスッキリさせるためにボタン1つにする
               <TouchableOpacity
                 style={styles.changeShelterButton}
                 onPress={() => {
@@ -1106,6 +1115,7 @@ export default function UserHome() {
                 fitFacilities(facilities);
               }
             }}
+            onSheetIndexChange={setBottomSheetIndex}
           />
         )}
 
@@ -1515,15 +1525,15 @@ const styles = StyleSheet.create({
     top: 250, // ★170から250くらいに下げると、開発ボタン(180)の下に綺麗に並びます
     right: 20,
     backgroundColor: "rgba(0, 0, 0, 0.75)",
-    padding: 12,
+    padding: 9,
     borderRadius: 16,
     alignItems: "center",
-    minWidth: 120,
+    minWidth: 100,
     elevation: 5,
   },
   navLabel: {
     color: "#ccc",
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: "600",
     marginBottom: 2,
   },
@@ -1533,7 +1543,7 @@ const styles = StyleSheet.create({
   },
   navDistance: {
     color: "#FFEE37", // 警告色と同じ黄色
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: "bold",
   },
   unitText: {
@@ -1568,12 +1578,19 @@ const styles = StyleSheet.create({
   qrButtonText: { fontWeight: "bold", fontSize: 16 },
   shelterSelectorWrapper: {
     position: "absolute",
-    bottom: 300, // HomeBottomSheet(snapPoints)の上に乗る位置
+    bottom: 10, // HomeBottomSheet(snapPoints)の上に乗る位置
     left: 0,
     right: 0,
     alignItems: "center", // 中央寄せ
-    zIndex: 100,
+    zIndex: 1,
   },
+  shelterSelectorWrapperSelected: {
+  bottom: 230,        
+  paddingBottom: 0,
+  zIndex: 1,
+  elevation: 0, 
+},
+  
   selectorTitle: {
     color: "white",
     fontSize: 14,
@@ -1589,7 +1606,7 @@ const styles = StyleSheet.create({
   changeShelterButton: {
     backgroundColor: "white",
     flexDirection: "row",
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 30,
     alignItems: "center",
@@ -1603,7 +1620,7 @@ const styles = StyleSheet.create({
   changeBtnText: {
     color: "#007AFF",
     fontWeight: "bold",
-    fontSize: 15,
+    fontSize: 10,
   },
   shelterCard: {
     width: 260,
