@@ -82,21 +82,39 @@ type Shelter = {
   capacity: number;
 };
 
+type Facility = {
+  facility_id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  business_hours?: string;
+  closed_days?: string;
+};
 // ===== クイック検索用の仮データ =====
 const QUICK_SEARCH_ITEMS = [
   {
     id: 1,
-    title: "市区役所",
+    title: '市区役所',
+    type: '市区役所',
   },
   {
     id: 2,
-    title: "図書館",
+    title: '図書館',
+    type: '図書館',
   },
   {
     id: 3,
-    title: "体育館",
+    title: '体育館',
+    type: '体育館',
   },
 ];
+
+const TYPE_MAP: Record<string, string> = {
+  市区役所: 'city_hall',
+  図書館: 'library',
+  体育館: 'gym',
+};
 
 // ===== 平常時施設情報の仮データ =====
 const MOCK_OFFICE_SERVICES: OfficeService[] = [
@@ -139,6 +157,11 @@ export default function UserHome() {
   const [selectedQuickSearch, setSelectedQuickSearch] = useState<string | null>(
     null,
   );
+ // ===== 施設位置 =====
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+
+
 
   // ---------------------------------------------------------
   // 2. ナビゲーション・地図状態 (Navigation States)
@@ -221,6 +244,67 @@ export default function UserHome() {
   // ---------------------------------------------------------
   // 5. API通信関数 (Data Fetching)
   // ---------------------------------------------------------
+  /**
+   * 施設情報の取得
+   */
+  const fetchFacilities = async (type?: string | null) => {
+    try {
+      setLoading(true);
+
+      const url =
+        type && type.trim().length > 0
+          ? `${getBaseUrl()}/facilities?type=${encodeURIComponent(type)}`
+          : `${getBaseUrl()}/facilities`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const list = data as Facility[];
+
+      setFacilities(data);
+
+      if (mode === MODES.NORMAL) {
+        setTimeout(() => {
+          fitFacilities(list);
+        }, 300);
+      }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+ /**
+   * 施設の現在の受付状況の取得
+   */
+  const fetchOfficeServices = async (facilityId?: string) => {
+    try {
+
+   
+
+      const res = await fetch(
+        `${getBaseUrl()}/facilities/${facilityId}/office-services`
+      );
+      const data = await res.json();
+
+      setOfficeServices(data);
+
+      // ===== 更新時間保存 =====
+      setLastUpdate(
+        new Date().toLocaleTimeString('ja-JP', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+
+    } catch (error) {
+
+      // ===== エラー表示 =====
+      console.log(error);
+
+    } 
+  };
 
   /**
    * 避難所リストの取得
@@ -255,42 +339,7 @@ export default function UserHome() {
     }
   };
 
-  /**
-   * 平常時：避難所混雑状況の取得
-   */
 
-  // ===== API取得 =====
-  const fetchOfficeServices = async () => {
-    try {
-      setLoading(true);
-      const baseUrl = getBaseUrl();
-      const response = await fetch(`${baseUrl}/shelters/crowd-counts`, {
-        method: "GET",
-        headers: API_HEADERS,
-      });
-
-      if (!response.ok) throw new Error("平常時APIエラー");
-      const result = await response.json();
-
-      if (result.crowd_counts) {
-        setOfficeServices(result.crowd_counts);
-      } else {
-        setOfficeServices(MOCK_OFFICE_SERVICES);
-      }
-
-      setLastUpdate(
-        new Date().toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    } catch (error) {
-      console.log("❌ 平常時APIエラー:", error);
-      setOfficeServices(MOCK_OFFICE_SERVICES);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   /**
    * 災害時：避難計画（ルート）の取得
@@ -363,6 +412,7 @@ export default function UserHome() {
         clearTimeout(timeoutId);
         return; // ←ここを通れば catch には行かないはず
       } else {
+        console.error("🔴 Google API status:", data.status, data.error_message);
         throw new Error(`Google API Status: ${data.status}`);
       }
     } catch (error) {
@@ -370,6 +420,11 @@ export default function UserHome() {
       console.log(
         "⚠️ オフラインまたはGoogle取得失敗：SQLiteバックアップへ移行",
       );
+      console.error("🔴 実際のエラー内容:", error); // ← これを追加
+      if (error instanceof Error) {
+    console.error("🔴 エラーメッセージ:", error.message);
+    console.error("🔴 エラー名:", error.name); // AbortError かどうかもここでわかる
+  }
       setIsOnline(false);
 
       // UserHomeScreen.tsx 内 loadEvacuationPlan の catch ブロック内
@@ -564,8 +619,34 @@ export default function UserHome() {
     };
   }, []);
 
+
+
   // ---------------------------------------------------------
-  // 8. 描画 (Render)
+  // 8. 平常時施設取得
+  // ---------------------------------------------------------
+
+
+   const fitFacilities = (list: Facility[]) => {
+    if (list.length === 0) return;
+
+    mapRef.current?.fitToCoordinates(
+      list.map((facility) => ({
+        latitude: facility.latitude,
+        longitude: facility.longitude,
+      })),
+      {
+        edgePadding: {
+          top: 80,
+          right: 80,
+          bottom: 80,
+          left: 80,
+        },
+        animated: true,
+      }
+    );
+  }; 
+  // ---------------------------------------------------------
+  // 9. 描画 (Render)
   // ---------------------------------------------------------
 
   return (
@@ -607,12 +688,40 @@ export default function UserHome() {
             />
           )}
           {mode === MODES.NORMAL ? (
-            // ===== 2. 平常モード：施設マーカーのみ表示 =====
-            <Marker
-              coordinate={facilityLocation}
-              title="大阪市役所"
-              description="公共施設"
-            />
+            // ===== 2. 常モード施設マーカー =====
+            <>
+              {facilities.map((facility) => (
+                <Marker
+                  key={facility.facility_id}
+                  coordinate={{
+                    latitude: facility.latitude,
+                    longitude: facility.longitude,
+                  }}
+                  image={
+                    facility.type === "city_hall"
+                      ? require("../../assets/images/markers/cityhall.png")
+                      : facility.type === "library"
+                        ? require("../../assets/images/markers/library.png")
+                        : require("../../assets/images/markers/gym.png")
+                  }
+                  onPress={() => {
+                    setSelectedFacility(facility);
+                    fetchOfficeServices(facility.facility_id);
+                    setShowBottomSheet(true);
+
+                    mapRef.current?.animateToRegion(
+                      {
+                        latitude: facility.latitude,
+                        longitude: facility.longitude,
+                        latitudeDelta: 0.003,
+                        longitudeDelta: 0.003,
+                      },
+                      500
+                    );
+                  }}
+                />
+              ))}
+            </>
           ) : (
             // ===== 3. 災害モード：ナビゲーション表示（複数重ねる） =====
             <>
@@ -804,19 +913,15 @@ export default function UserHome() {
                 onPress={() => {
                   if (selectedQuickSearch === item.title) {
                     setSelectedQuickSearch(null);
-
-                    setShowBottomSheet(false);
-
-                    return;
+                    fetchFacilities(null);
+                  } else {
+                    setSelectedQuickSearch(item.title);
+                    fetchFacilities(TYPE_MAP[item.title]);
                   }
 
-                  setSelectedQuickSearch(item.title);
-
-                  if (item.title === "市区役所") {
-                    moveToCityHall();
-
-                    setShowBottomSheet(true);
-                  }
+                  setSelectedFacility(null);
+                  setShowBottomSheet(false);
+                  setOfficeServices([]);
                 }}
               >
                 <Text style={styles.quickSearchText}>{item.title}</Text>
@@ -986,13 +1091,21 @@ export default function UserHome() {
 
         {/* ===== BottomSheet ===== */}
         {showBottomSheet && (
-          <HomeBottomSheet
+         <HomeBottomSheet
             mode={mode}
-            selectedShelter={selectedShelter}
             officeServices={officeServices}
             loading={loading}
             lastUpdate={lastUpdate}
             onRefresh={fetchOfficeServices}
+            selectedFacility={selectedFacility}
+            selectedShelter={selectedShelter}
+            visible={showBottomSheet}
+            onClose={() => {
+              setShowBottomSheet(false);
+              if (mode === MODES.NORMAL) {
+                fitFacilities(facilities);
+              }
+            }}
           />
         )}
 

@@ -1,7 +1,7 @@
 // frontend\src\components\home\HomeBottomSheet.tsx
 
 // ===== React =====
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState,useEffect } from "react";
 import { router } from "expo-router";
 // ===== BottomSheet =====
 import BottomSheet, {
@@ -17,6 +17,15 @@ import NormalModeContent from "./NormalModeContent";
 import DisasterModeContent from "./DisasterModeContent";
 
 // ===== Types =====
+
+type Facility = {
+  facility_id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+};
+
 type OfficeService = {
   id: number;
   title: string;
@@ -39,8 +48,11 @@ type Props = {
   officeServices: OfficeService[];
   loading: boolean;
   lastUpdate: string;
-  onRefresh: () => void;
-  selectedShelter: Shelter | null;
+ onRefresh: (facilityId: string) => void;
+  selectedFacility: Facility | null;
+  visible: boolean;
+  onClose: () => void;
+  selectedShelter?: Shelter | null;
 };
 
 const MODES = {
@@ -49,11 +61,14 @@ const MODES = {
 };
 
 export default function HomeBottomSheet({
-  mode,
+   mode,
   officeServices,
   loading,
   lastUpdate,
   onRefresh,
+  selectedFacility,
+  visible,
+  onClose,
   selectedShelter,
 }: Props) {
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -65,6 +80,20 @@ export default function HomeBottomSheet({
     }
     return ["33%", "88%"];
   }, [mode]);
+
+  const sheetRef = useRef<BottomSheet>(null);
+
+  const index = !visible ? -1 : 0;
+
+  useEffect(() => {
+    if (!selectedFacility?.facility_id) return;
+    onRefresh(selectedFacility.facility_id);
+  }, [selectedFacility]);
+
+  const title =
+    mode === MODES.NORMAL
+      ? selectedFacility?.name ?? "大阪市役所"
+      : selectedShelter?.name ?? "避難所を選択してください";
 
   return (
     <>
@@ -87,13 +116,7 @@ export default function HomeBottomSheet({
       >
         <BottomSheetView style={styles.container}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>
-              {mode === MODES.NORMAL
-                ? "大阪市役所"
-                : selectedShelter
-                  ? selectedShelter.name
-                  : "避難所を選択してください"}
-            </Text>
+            <Text style={styles.title}>{title}</Text>
 
             {mode === MODES.NORMAL && (
               <TouchableOpacity
@@ -113,7 +136,10 @@ export default function HomeBottomSheet({
               officeServices={officeServices}
               loading={loading}
               lastUpdate={lastUpdate}
-              onRefresh={onRefresh}
+              onRefresh={() =>
+                selectedFacility?.facility_id &&
+                onRefresh(selectedFacility.facility_id)
+              }
             />
           ) : (
             /* ========================= */

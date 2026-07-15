@@ -105,6 +105,17 @@ def get_user_role():
         conn.close()   
 
 
+@router.get("/{user_id}", summary="IDでユーザーを取得する")
+def get_user(user_id: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
+            user = cur.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
+            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
+        
+
 
 
 # 本来は認証トークンから取得しますが、今はテストユーザーの固定UUIDを使用します
@@ -176,17 +187,6 @@ def update_user_profile(profile: UserProfileUpdate):
         conn.close()             
 
 
-
-@router.get("/{user_id}", summary="IDでユーザーを取得する")
-def get_user(user_id: str):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
-            user = cur.fetchone()
-            if not user:
-                raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
-            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
-        
 
 
 
