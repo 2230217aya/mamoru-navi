@@ -43,13 +43,17 @@ VALUES
 -- city hall
 (
     (SELECT type_id FROM facility_types WHERE type_name='city_hall'),
-    '住民票発行'
+    '証明書の発行'
 ),
 (
     (SELECT type_id FROM facility_types WHERE type_name='city_hall'),
-    '戸籍手続き'
+    '住所の変動・印鑑登録'
 ),
 (
     (SELECT type_id FROM facility_types WHERE type_name='city_hall'),
-    '転入・転出届'
+    'マイナンバー'
+),
+( 
+    (SELECT type_id FROM facility_types WHERE type_name='city_hall'),
+    '戸籍の提出・相談'
 );

@@ -1,4 +1,5 @@
 -- 平常時の公共施設（施設の予約)
+--backend\sql\07create_facility_reservations.sql
 CREATE TABLE IF NOT EXISTS facility_reservations (
     reservation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
