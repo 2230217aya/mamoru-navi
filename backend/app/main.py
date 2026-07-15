@@ -545,7 +545,7 @@ def get_location_info(lat: float, lng: float):
                 ],
             }
 
-# --- 2. 経路計算API (HEAD側の苦労した機能をそのままキープ) ---
+# --- 2. 経路計算API  ---
 @app.get("/map/my-plan/{user_id}")
 def get_my_evacuation_plan(user_id: str):
     conn = None

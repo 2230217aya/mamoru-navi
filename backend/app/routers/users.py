@@ -17,6 +17,11 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+
+# --- テスト用固定ID (本来は認証から取得) ---
+TEST_USER_ID = "11111111-1111-1111-1111-111111111111"
+
+
 # --- レスポンスモデルの定義 ---
 class UserCreate(BaseModel):
     name: str
@@ -106,9 +111,6 @@ def get_user_role():
 
 
 
-
-# 本来は認証トークンから取得しますが、今はテストユーザーの固定UUIDを使用します
-TEST_USER_ID = "11111111-1111-1111-1111-111111111111"
 
 @router.get("/profile", summary="ユーザーのプロフィールを取得")
 def get_user_profile():
