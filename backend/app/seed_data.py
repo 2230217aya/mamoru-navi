@@ -38,5 +38,15 @@ SHELTERS_DATA = [
     {"id": "f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2", "name": "市立大淀小学校", "address": "大阪市北区大淀中4-10-33", "lat": 34.7060, "lon": 135.4825, "capacity": 600, "toilet": 13, "supplies": ["充電器", "水"]},
     {"id": "f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3", "name": "市立菅北小学校", "address": "大阪市北区菅栄町9-5", "lat": 34.7110, "lon": 135.5145, "capacity": 650, "toilet": 14, "supplies": ["食料", "簡易トイレ"]},
     {"id": "f4f4f4f4-f4f4-f4f4-f4f4-f4f4f4f4f4f4", "name": "市立扇町中学校", "address": "大阪市北区松ケ枝町1-38", "lat": 34.6955, "lon": 135.5195, "capacity": 1300, "toilet": 28, "supplies": ["医療キット", "簡易ベッド", "水"]},
-    {"id": "f5f5f5f5-f5f5-f5f5-f5f5-f5f5f5f5f5f5", "name": "市立中之島小学校", "address": "大阪市北区中之島6-2-55", "lat": 34.6845, "lon": 135.4815, "capacity": 400, "toilet": 10, "supplies": ["食料", "毛布"]}
+    {"id": "f5f5f5f5-f5f5-f5f5-f5f5-f5f5f5f5f5f5", "name": "市立中之島小学校", "address": "大阪市北区中之島6-2-55", "lat": 34.6845, "lon": 135.4815, "capacity": 400, "toilet": 10, "supplies": ["食料", "毛布"]},
+
+    # --- 箕面市 ---
+    # IDを正しいUUID形式（16進数：0-9, a-fのみ）に書き換えました
+    {"id": "baaaaaaa-1111-1111-1111-111111111111", "name": "箕面市立第一中学校", "address": "箕面市新稲3丁目12番1号", "lat": 34.8322, "lon": 135.4622, "capacity": 1200, "toilet": 11, "supplies": ["水", "食料"]},
+    {"id": "baaaaaaa-2222-2222-2222-222222222222", "name": "箕面市立西小学校", "address": "箕面市新稲3丁目1番1号", "lat": 34.8295, "lon": 135.4650, "capacity": 1000, "toilet": 10, "supplies": ["毛布", "簡易トイレ"]},
+    {"id": "baaaaaaa-3333-3333-3333-333333333333", "name": "箕面市立北小学校", "address": "箕面市箕面4丁目11番43号", "lat": 34.8335, "lon": 135.4745, "capacity": 900, "toilet": 9, "supplies": ["食料", "水"]},
+    {"id": "baaaaaaa-4444-4444-4444-444444444444", "name": "スカイアリーナ（箕面市立総合運動場）", "address": "箕面市新稲2丁目14番45号", "lat": 34.8365, "lon": 135.4600, "capacity": 1500, "toilet": 15, "supplies": ["簡易ベッド", "医療キット"]},
+    {"id": "baaaaaaa-5555-5555-5555-555555555555", "name": "箕面市立西南小学校", "address": "箕面市瀬川3丁目2番1号", "lat": 34.8145, "lon": 135.4520, "capacity": 1100, "toilet": 12, "supplies": ["食料", "毛布"]},
+    {"id": "baaaaaaa-6666-6666-6666-666666666666", "name": "箕面市立萱野小学校", "address": "箕面市萱野3丁目9番1号", "lat": 34.8260, "lon": 135.4850, "capacity": 1000, "toilet": 10, "supplies": ["水", "簡易トイレ"]},
+    {"id": "baaaaaaa-7777-7777-7777-777777777777", "name": "箕面市役所（本館）", "address": "箕面市西小路4丁目6番1号", "lat": 34.8235, "lon": 135.4700, "capacity": 500, "toilet": 5, "supplies": ["食料", "水"]},
 ]

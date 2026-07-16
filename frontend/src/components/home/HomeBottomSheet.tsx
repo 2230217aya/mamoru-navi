@@ -3,21 +3,17 @@
 // ===== React =====
 import React, { useMemo, useRef, useState,useEffect } from "react";
 import { router } from "expo-router";
-// ===== BottomSheet =====
 import BottomSheet, {
   BottomSheetView,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-
-// ===== React Native =====
 import { Image, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 
-// ===== Components =====
+// 既存のパーツ
 import NormalModeContent from "./NormalModeContent";
 import DisasterModeContent from "./DisasterModeContent";
 
-// ===== Types =====
-
+// 型定義の統合
 type Facility = {
   facility_id: string;
   name: string;
@@ -39,8 +35,6 @@ type Shelter = {
   latitude: number;
   longitude: number;
   capacity: number;
-  toilet_count?: number; // あなたが追加したフィールド
-  supplies?: string[]; // あなたが追加したフィールド
 };
 
 type Props = {
@@ -80,11 +74,9 @@ export default function HomeBottomSheet({
     onSheetIndexChange?.(index); 
   };
 
+  // 高さ設定の統合
   const snapPoints = useMemo(() => {
-    if (mode === MODES.NORMAL) {
-      return ["16%", "47%"];
-    }
-    return ["33%", "88%"];
+    return mode === MODES.NORMAL ? ["16%", "47%"] : ["33%", "88%"];
   }, [mode]);
 
    // 災害モードでまだ避難所を選んでいない時は、シート操作を無効化する
@@ -100,27 +92,23 @@ export default function HomeBottomSheet({
 
   const title =
     mode === MODES.NORMAL
-      ? selectedFacility?.name ?? "大阪市役所"
+      ? selectedFacility?.name ?? "施設情報"
       : selectedShelter?.name ?? "避難所を選択してください";
 
   return (
     <>
-      {/* ===== BottomSheet ===== */}
       <BottomSheet
+        key={isShelterUnselected ? "locked" : "unlocked"}
         ref={bottomSheetRef}
         index={isShelterUnselected ? 0 : sheetIndex}
         onChange={handleSheetChange}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
-        backgroundStyle={{
-          backgroundColor: "#fff",
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-        }}
-        handleIndicatorStyle={{
-          backgroundColor: "#ccc",
-          width: 60,
-        }}
+        enablePanDownToClose={mode === MODES.NORMAL}
+          enableContentPanningGesture={!isShelterUnselected} 
+          enableHandlePanningGesture={!isShelterUnselected}  
+        onClose={onClose}
+        backgroundStyle={styles.sheetBackground}
       >
         <BottomSheetView style={styles.container}>
           <View style={styles.titleRow}>
@@ -136,9 +124,7 @@ export default function HomeBottomSheet({
             )}
           </View>
 
-          {/* ========================= */}
-          {/* NORMAL MODE */}
-          {/* ========================= */}
+          {/* モードに応じたコンテンツの切り替え */}
           {mode === MODES.NORMAL ? (
             <NormalModeContent
               officeServices={officeServices}
@@ -150,10 +136,6 @@ export default function HomeBottomSheet({
               }
             />
           ) : (
-            /* ========================= */
-            /* DISASTER MODE */
-            /* ========================= */
-
             <BottomSheetScrollView
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
@@ -197,17 +179,22 @@ export default function HomeBottomSheet({
   );
 }
 
-// ===== Style =====
 const styles = StyleSheet.create({
+  sheetBackground: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
   container: {
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
-
   title: {
     fontSize: 22,
     fontWeight: "bold",
+    color: "#333",
+    flex: 1,
   },
   titleRow: {
     flexDirection: "row",
@@ -215,28 +202,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-
   scrollContent: {
     paddingBottom: 200,
   },
-
+  reserveButton: {
+    backgroundColor: "#FFEE37",
+    paddingHorizontal: 25,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  reserveButtonText: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
   fixedStatsContainer: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-
     paddingHorizontal: 20,
     paddingBottom: 20,
     paddingTop: 12,
-
     flexDirection: "row",
     gap: 12,
-
     backgroundColor: "#fff",
     zIndex: 999,
+    // 影をつけてパネル感を出す
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 10,
   },
-
   statBox: {
     flex: 1,
     backgroundColor: "#FFEE37",
@@ -244,7 +242,6 @@ const styles = StyleSheet.create({
     height: 140,
     padding: 12,
   },
-
   statBox2: {
     flex: 1,
     backgroundColor: "#D9D9D9",
@@ -252,37 +249,24 @@ const styles = StyleSheet.create({
     height: 140,
     padding: 12,
   },
-
   statTitle: {
     fontSize: 18,
     fontWeight: "bold",
+    color: "#000",
   },
-
   statValue: {
     position: "absolute",
     left: 12,
     bottom: 10,
     fontSize: 30,
     fontWeight: "bold",
+    color: "#000",
   },
-
   statImage: {
     position: "absolute",
     right: 10,
     bottom: 10,
     width: 50,
     height: 50,
-  },
-  reserveButton: {
-    backgroundColor: "#FFEE37",
-    paddingHorizontal: 30,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-
-  reserveButtonText: {
-    color: "#000",
-    fontSize: 14,
-    fontWeight: "bold",
   },
 });
