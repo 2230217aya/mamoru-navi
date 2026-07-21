@@ -91,22 +91,30 @@ type Facility = {
   business_hours?: string;
   closed_days?: string;
 };
-
-// クイック検索用定数
-const TYPE_MAP: Record<string, string> = {
-  市区役所: "city_hall",
-  図書館: "library",
-  体育館: "gym",
-};
-
+// ===== クイック検索用の仮データ =====
 const QUICK_SEARCH_ITEMS = [
-  { id: 1, title: "市区役所" },
-  { id: 2, title: "図書館" },
-  { id: 3, title: "体育館" },
+  {
+    id: 1,
+    title: '市区役所',
+    type: '市区役所',
+  },
+  {
+    id: 2,
+    title: '図書館',
+    type: '図書館',
+  },
+  {
+    id: 3,
+    title: '体育館',
+    type: '体育館',
+  },
 ];
 
-// コンポーネント自体を any でキャストして使う
-const RootView = GestureHandlerRootView as any;
+const TYPE_MAP: Record<string, string> = {
+  市区役所: 'city_hall',
+  図書館: 'library',
+  体育館: 'gym',
+};
 
 // ===== 平常時施設情報の仮データ =====
 const MOCK_OFFICE_SERVICES: OfficeService[] = [
@@ -140,12 +148,18 @@ export default function UserHome() {
   // ---------------------------------------------------------
   const [mode, setMode] = useState(MODES.NORMAL); // 平常/災害モード
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [bottomSheetIndex, setBottomSheetIndex] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   const [loading, setLoading] = useState(false); // 通信中フラグ
   const [lastUpdate, setLastUpdate] = useState(""); // 最終更新時刻
   const [selectedQuickSearch, setSelectedQuickSearch] = useState<string | null>(
     null,
   );
+//  // ===== 施設位置 =====
+//   const [facilities, setFacilities] = useState<Facility[]>([]);
+//   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+
+
 
   // ---------------------------------------------------------
   // 2. 平常モード用
@@ -234,17 +248,6 @@ export default function UserHome() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fitFacilities = (list: Facility[]) => {
-    if (list.length === 0) return;
-    mapRef.current?.fitToCoordinates(
-      list.map((f) => ({ latitude: f.latitude, longitude: f.longitude })),
-      {
-        edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-        animated: true,
-      },
-    );
   };
 
   // ---------------------------------------------------------
@@ -360,6 +363,7 @@ export default function UserHome() {
         clearTimeout(timeoutId);
         return;
       } else {
+        console.error("🔴 Google API status:", data.status, data.error_message);
         throw new Error(`Google API Status: ${data.status}`);
       }
     } catch (error: any) {
@@ -465,9 +469,10 @@ export default function UserHome() {
   // 7. 副作用監視
   // ---------------------------------------------------------
   useEffect(() => {
-    fetchFacilities(null); // 平常時施設の初期読み込み
-    fetchShelters();
-    loadEvacuationPlan();
+    fetchFacilities(null); 
+    fetchOfficeServices();
+    fetchShelters(); // 避難所リストを取得
+    loadEvacuationPlan(); // 事前の備蓄を試みる
   }, []);
 
   // B. ネットワーク状態の監視
@@ -602,11 +607,35 @@ export default function UserHome() {
   const remainingRoute =
     nearestIdx !== -1 ? routeCoordinates.slice(nearestIdx) : routeCoordinates;
   // ---------------------------------------------------------
-  // 8. 描画 (Render)
+  // 8. 平常時施設取得
+  // ---------------------------------------------------------
+
+
+   const fitFacilities = (list: Facility[]) => {
+    if (list.length === 0) return;
+
+    mapRef.current?.fitToCoordinates(
+      list.map((facility) => ({
+        latitude: facility.latitude,
+        longitude: facility.longitude,
+      })),
+      {
+        edgePadding: {
+          top: 80,
+          right: 80,
+          bottom: 80,
+          left: 80,
+        },
+        animated: true,
+      }
+    );
+  }; 
+  // ---------------------------------------------------------
+  // 9. 描画 (Render)
   // ---------------------------------------------------------
 
   return (
-    <RootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
         {/* 開発確認用タグ */}
 
@@ -671,7 +700,7 @@ export default function UserHome() {
                         latitudeDelta: 0.003,
                         longitudeDelta: 0.003,
                       },
-                      500,
+                      500
                     );
                   }}
                 />
@@ -867,13 +896,14 @@ export default function UserHome() {
                   if (selectedQuickSearch === item.title) {
                     setSelectedQuickSearch(null);
                     fetchFacilities(null);
-                    setShowBottomSheet(false);
                   } else {
                     setSelectedQuickSearch(item.title);
                     fetchFacilities(TYPE_MAP[item.title]);
-                    setSelectedFacility(null);
-                    setShowBottomSheet(false);
                   }
+
+                  setSelectedFacility(null);
+                  setShowBottomSheet(false);
+                  setOfficeServices([]);
                 }}
               >
                 <Text style={styles.quickSearchText}>{item.title}</Text>
@@ -905,6 +935,10 @@ export default function UserHome() {
 
               // ===== BottomSheet非表示 =====
               setShowBottomSheet(false);
+              setSelectedFacility(null);
+              setSelectedQuickSearch(null);
+              fetchFacilities(null); // 施設情報を取得
+              fitFacilities(facilities);
             }}
           >
             <Text
@@ -962,17 +996,20 @@ export default function UserHome() {
           </TouchableOpacity>
         </View>
 
-        {/* 災害時：避難所選択リスト */}
-        {/* 災害時：避難所選択エリア */}
-        {mode === MODES.DISASTER && nearShelters.length > 0 && (
-          <View style={styles.shelterSelectorWrapper}>
+        {/* 災害時オンライン用の避難所選択リスト */}
+        {mode === MODES.DISASTER && isOnline && nearShelters.length > 0 && (
+          <View style={[
+            styles.shelterSelectorWrapper,
+            selectedShelterId && styles.shelterSelectorWrapperSelected,
+          ]}>
+            {/* ★ 変更ポイント：未選択 (!selectedShelterId) の時だけカードを出す */}
             {!selectedShelterId ? (
               /* --- 1. 未選択：3枚の避難所カードを表示 --- */
               <>
-                <Text style={styles.selectorTitle}>
+                {/* <Text style={styles.selectorTitle}>
                   避難所を選択してください
-                </Text>
-                <View style={{ height: 160 }}>
+                </Text> */}
+                <View style={{ height: 150 }}>
                   <Animated.ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -1006,7 +1043,8 @@ export default function UserHome() {
                 </View>
               </>
             ) : (
-              /* --- 2. 選択済み：ルート案内に集中するため「変更ボタン」だけ表示 --- */
+              bottomSheetIndex === 0 &&
+              // 避難所が「選択済み」の時は、画面をスッキリさせるためにボタン1つにする
               <TouchableOpacity
                 style={styles.changeShelterButton}
                 onPress={() => {
@@ -1024,16 +1062,22 @@ export default function UserHome() {
 
         {/* ===== BottomSheet ===== */}
         {showBottomSheet && (
-          <HomeBottomSheet
+         <HomeBottomSheet
             mode={mode}
-            selectedShelter={selectedShelter}
-            selectedFacility={selectedFacility}
             officeServices={officeServices}
             loading={loading}
             lastUpdate={lastUpdate}
-            onRefresh={(facilityId) => fetchOfficeServices(facilityId)}
+            onRefresh={fetchOfficeServices}
+            selectedFacility={selectedFacility}
+            selectedShelter={selectedShelter}
             visible={showBottomSheet}
-            onClose={() => setShowBottomSheet(false)}
+            onClose={() => {
+              setShowBottomSheet(false);
+              if (mode === MODES.NORMAL) {
+                fitFacilities(facilities);
+              }
+            }}
+            onSheetIndexChange={setBottomSheetIndex}
           />
         )}
 
@@ -1065,7 +1109,7 @@ export default function UserHome() {
           </View>
         </Modal>
       </SafeAreaView>
-    </RootView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -1443,15 +1487,15 @@ const styles = StyleSheet.create({
     top: 250, // ★170から250くらいに下げると、開発ボタン(180)の下に綺麗に並びます
     right: 20,
     backgroundColor: "rgba(0, 0, 0, 0.75)",
-    padding: 12,
+    padding: 9,
     borderRadius: 16,
     alignItems: "center",
-    minWidth: 120,
+    minWidth: 100,
     elevation: 5,
   },
   navLabel: {
     color: "#ccc",
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: "600",
     marginBottom: 2,
   },
@@ -1461,7 +1505,7 @@ const styles = StyleSheet.create({
   },
   navDistance: {
     color: "#FFEE37", // 警告色と同じ黄色
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: "bold",
   },
   unitText: {
@@ -1496,18 +1540,19 @@ const styles = StyleSheet.create({
   qrButtonText: { fontWeight: "bold", fontSize: 16 },
   shelterSelectorWrapper: {
     position: "absolute",
-    bottom: 300,
+    bottom: 10, // HomeBottomSheet(snapPoints)の上に乗る位置
     left: 0,
     right: 0,
-    alignItems: "center",
-    zIndex: 9999,
+    alignItems: "center", // 中央寄せ
+    zIndex: 1,
   },
-
-  changeBtnText: {
-    color: "#007AFF",
-    fontWeight: "bold",
-    fontSize: 15,
-  },
+  shelterSelectorWrapperSelected: {
+  bottom: 230,        
+  paddingBottom: 0,
+  zIndex: 1,
+  elevation: 0, 
+},
+  
   selectorTitle: {
     color: "white",
     fontSize: 14,
@@ -1522,7 +1567,7 @@ const styles = StyleSheet.create({
   changeShelterButton: {
     backgroundColor: "white",
     flexDirection: "row",
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 30,
     alignItems: "center",
@@ -1532,6 +1577,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 5,
     marginBottom: 20, // 少し上に浮かせる
+  },
+  changeBtnText: {
+    color: "#007AFF",
+    fontWeight: "bold",
+    fontSize: 10,
   },
   shelterCard: {
     width: 260,

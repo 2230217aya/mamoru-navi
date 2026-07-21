@@ -1,6 +1,7 @@
 // frontend\src\components\home\HomeBottomSheet.tsx
 
-import React, { useEffect, useMemo, useRef } from "react";
+// ===== React =====
+import React, { useMemo, useRef, useState,useEffect } from "react";
 import { router } from "expo-router";
 import BottomSheet, {
   BottomSheetView,
@@ -41,11 +42,12 @@ type Props = {
   officeServices: OfficeService[];
   loading: boolean;
   lastUpdate: string;
-  onRefresh: (facilityId?: string) => void; // 統合のため optional 引数に
+ onRefresh: (facilityId: string) => void;
   selectedFacility: Facility | null;
-  selectedShelter: Shelter | null; // null許容
   visible: boolean;
   onClose: () => void;
+  selectedShelter?: Shelter | null;
+  onSheetIndexChange?: (index: number) => void;
 };
 
 const MODES = {
@@ -54,47 +56,57 @@ const MODES = {
 };
 
 export default function HomeBottomSheet({
-  mode,
+   mode,
   officeServices,
   loading,
   lastUpdate,
   onRefresh,
   selectedFacility,
-  selectedShelter,
   visible,
   onClose,
+  selectedShelter,
+   onSheetIndexChange,
 }: Props) {
-  const sheetRef = useRef<BottomSheet>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const [sheetIndex, setSheetIndex] = useState(0);
+   const handleSheetChange = (index: number) => {
+    setSheetIndex(index);
+    onSheetIndexChange?.(index); 
+  };
 
   // 高さ設定の統合
   const snapPoints = useMemo(() => {
     return mode === MODES.NORMAL ? ["16%", "47%"] : ["33%", "88%"];
   }, [mode]);
 
-  // 表示状態の管理
+   // 災害モードでまだ避難所を選んでいない時は、シート操作を無効化する
+  const isShelterUnselected = mode === MODES.DISASTER && !selectedShelter;
+  const sheetRef = useRef<BottomSheet>(null);
+
   const index = !visible ? -1 : 0;
 
-  // 施設が選ばれたら自動リフレッシュ（平常時用）
   useEffect(() => {
-    if (mode === MODES.NORMAL && selectedFacility?.facility_id) {
-      onRefresh(selectedFacility.facility_id);
-    }
-  }, [selectedFacility, mode]);
+    if (!selectedFacility?.facility_id) return;
+    onRefresh(selectedFacility.facility_id);
+  }, [selectedFacility]);
 
-  // タイトルの決定
   const title =
     mode === MODES.NORMAL
-      ? (selectedFacility?.name ?? "施設情報")
-      : (selectedShelter?.name ?? "避難所を選択してください");
+      ? selectedFacility?.name ?? "施設情報"
+      : selectedShelter?.name ?? "避難所を選択してください";
 
   return (
     <>
       <BottomSheet
-        ref={sheetRef}
-        index={index}
+        key={isShelterUnselected ? "locked" : "unlocked"}
+        ref={bottomSheetRef}
+        index={isShelterUnselected ? 0 : sheetIndex}
+        onChange={handleSheetChange}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
         enablePanDownToClose={mode === MODES.NORMAL}
+          enableContentPanningGesture={!isShelterUnselected} 
+          enableHandlePanningGesture={!isShelterUnselected}  
         onClose={onClose}
         backgroundStyle={styles.sheetBackground}
       >
@@ -118,7 +130,10 @@ export default function HomeBottomSheet({
               officeServices={officeServices}
               loading={loading}
               lastUpdate={lastUpdate}
-              onRefresh={() => onRefresh(selectedFacility?.facility_id)}
+              onRefresh={() =>
+                selectedFacility?.facility_id &&
+                onRefresh(selectedFacility.facility_id)
+              }
             />
           ) : (
             <BottomSheetScrollView
@@ -134,8 +149,8 @@ export default function HomeBottomSheet({
         </BottomSheetView>
       </BottomSheet>
 
-      {/* 災害モード時のみ表示される統計パネル（シートの外に配置） */}
-      {mode === MODES.DISASTER && visible && (
+      {/* 災害時の統計パネル連動 */}
+      {mode === MODES.DISASTER && selectedShelter && (
         <View style={styles.fixedStatsContainer}>
           <View style={styles.statBox}>
             <Text style={styles.statTitle}>移動中</Text>
