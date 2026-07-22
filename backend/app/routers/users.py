@@ -183,11 +183,12 @@ def update_user_profile(profile: UserProfileUpdate):
 def get_user(user_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT user_id, name, email FROM users WHERE user_id = %s", (user_id,))
+            cur.execute("SELECT user_id, name, gender, birthday, blood_type, phone_number, email FROM users WHERE user_id = %s", (user_id,))
             user = cur.fetchone()
             if not user:
                 raise HTTPException(status_code=404, detail="ユーザーが見つかりません!")
-            return {"user_id": str(user[0]), "name": user[1], "email": user[2]}
+            return {"user_id": str(user[0]), "name": user[1], "gender": user[2], "birthday": user[3], "blood_type": user[4], "phone_number": user[5], "email": user[6]}
+
         
 
 
