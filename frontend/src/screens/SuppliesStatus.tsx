@@ -3,16 +3,20 @@ import { Stack, router  } from 'expo-router';
 import { useState, useEffect } from 'react';
 import SuppliesGenre from '../components/suppliesGenre-component';
 import Clock from '../components/clock-component';
-
-// apiのurl
-const API_BASE_URL = "";
-// 使用するapiのurl
-// /の後に付け足す
-const SUPPLIES_API_URL = `${API_BASE_URL}/`;
+import { useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 export default function suppliesStatus() {
+    // ユーザー一覧画面から送られた避難所のIDを取得
+    const { SHELTER_ID } = useLocalSearchParams<{SHELTER_ID: string;}>();
+
+    // apiのurl
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+    const SUPPLIES_API_URL = `${API_BASE_URL}/supplies/${SHELTER_ID}`;
+
     // 物資状況のデータ
-    type supplies = {
+    type Supply = {
         name?: string;  // 物資名
         count: number;  // 物資の数量
         // 飲料水 食べ物 寝具 衣類 生活用水 薬 衛生用品 その他
@@ -20,70 +24,81 @@ export default function suppliesStatus() {
         unit?: string   // 単位(n本とか n食とか)
     };
     // 物資状況の受け取り皿
-    const [suppliess, setSupplies] = useState<supplies[]>([]);
+    const [supplies, setSupplies] = useState<Supply[]>([]);
+
+    // 物資の単位
+    const unitConvert: Record<string, string> = {
+        bottle: "本",
+        meal: "食",
+        can: "缶",
+        cup: "杯",
+        bag: "袋",
+        sheet: "枚",
+        piece: "張",
+        liter: "L",
+        tablet: "錠",
+        roll: "ロール",
+    };
 
     // バックから送られた避難所データの内データの名前がuseStateと違っていたら入力し直す
     // .testの部分をバックの型名に変更
     const convertSuppliesData = (suppliesData: any) => {
-        return suppliesData.map((supplies: any) => ({
-        name: supplies.test,
-        count: supplies.test,
-        genre: supplies.test,
-        unit: supplies.test,
+        return suppliesData.map((supply: any) => ({
+            name: supply.name,
+            count: supply.quantity,
+            genre: supply.genre as Supply["genre"],
+            unit: unitConvert[supply.unit] ?? supply.unit,
         }));
     };
 
-    // 画面表示時に実行
-    useEffect(() => {
-        const fetchSData = async () => {
-            // 物資状況の情報取得(テスト用)
-            const testSupplies: supplies[] = [
-                // 飲料水
-                {name: "", count: 500, genre: "drinking_water", unit: "本"},
-                // 食べ物
-                {name: "アルファ化米", count: 250, genre: "food", unit: "食"},
-                {name: "缶詰", count: 55, genre: "food", unit: "缶"},
-                {name: "カップラーメン", count: 100, genre: "food", unit: "杯"},
-                {name: "乾パン", count: 150, genre: "food", unit: "袋"},
-                // 寝具・衣類
-                {name: "パーテーション", count: 400, genre: "bedding", unit: "枚"},
-                {name: "テント", count: 60, genre: "bedding", unit: "張"},
-                {name: "マット", count: 120, genre: "bedding", unit: "枚"},
-                // 生活用水
-                {name: "", count: 150000, genre: "domestic_water", unit: "L"},
-                // 薬
-                {name: "解熱鎮痛剤", count: 20, genre: "medicine", unit: "錠"},
-                {name: "胃腸薬", count: 20, genre: "medicine", unit: "錠"},
-                {name: "消毒液", count: 20, genre: "medicine", unit: "錠"},
-                {name: "皮膚薬", count: 20, genre: "medicine", unit: "錠"},
-                {name: "整腸剤", count: 20, genre: "medicine", unit: "錠"},
-                {name: "目薬", count: 10, genre: "medicine", unit: "本"},
-                {name: "鎮痛剤", count: 20, genre: "medicine", unit: "錠"},
-                {name: "風邪薬", count: 50, genre: "medicine", unit: "錠"},
-                // 衛生用品
-                {name: "トイレットペーパー", count: 120, genre: "hygiene_supplies", unit: "ロール"},
-                {name: "紙おむつ", count: 300, genre: "hygiene_supplies", unit: "枚"},
-                {name: "生理用品", count: 300, genre: "hygiene_supplies", unit: "枚"},
-                // その他
-                {name: "保温シート", count: 200, genre: "other", unit: "枚"},
-                {name: "ゴミ袋", count: 200, genre: "other", unit: "枚"},
-                {name: "乾電池", count: 80, genre: "other", unit: "本"},
-                {name: "ガソリン", count: 20, genre: "other", unit: "リットル"},
-            ];
-            setSupplies(testSupplies);
+    // 期限は違うが名前や分類が同じ物資をまとめる
+    const mergeSuppliesData = (suppliesData: Supply[]) => {
+    const merged: {[key:string]: Supply} = {};
+        suppliesData.forEach((supply) => {
+            const key = `${supply.genre}_${supply.name}_${supply.unit}`;
+            // 同じ物資なら数量を足す
+            if (merged[key]) {merged[key].count += supply.count;} 
+            else {merged[key] = {...supply};}
+        });
+        return Object.values(merged);
+    };
 
-            // // 物資状況の情報取得
-            // const response = await fetch(SUPPLIES_API_URL);
-            // const suppliesData = await response.json();
-            // setSupplies(suppliesData);
-        };
-        fetchSData();
-    },[]);
+    const fetchSData = async () => {
+        try {
+            // 物資状況の情報取得
+            const response = await fetch(SUPPLIES_API_URL);
+            if (!response.ok) {throw new Error("supplies fetch failed");}
+            let suppliesData = await response.json();
+
+            // バックから送られたデータの名前がuseStateと違っていたら名前変換
+            suppliesData = convertSuppliesData(suppliesData);
+
+            // 同じ名前の物資をまとめる
+            suppliesData = mergeSuppliesData(suppliesData);
+
+            console.log("物資データ:", suppliesData);
+
+            setSupplies(suppliesData);
+
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    // 画面表示時に実行
+    useFocusEffect(
+        useCallback(() => {
+            fetchSData();
+        }, [SHELTER_ID])
+    );
 
     return(
         <View style={styles.container}>
             <View style={styles.header}>
-                <Pressable onPress={() => router.push("/supplies-management")}>
+                <Pressable onPress={() => router.push({
+                    pathname:"/supplies-management",
+                    params: {SHELTER_ID: SHELTER_ID},
+                })}>
                     <Text style={styles.supplyStatus}>物資状況＞</Text>
                 </Pressable>
                 {/* 現在時刻取得 */}
@@ -95,49 +110,49 @@ export default function suppliesStatus() {
                 <Text style={styles.genre}>飲料水</Text>
                 <SuppliesGenre
                     genre="drinking_water"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>食べ物</Text>
                 <SuppliesGenre
                     genre="food"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>寝具</Text>
                 <SuppliesGenre
                     genre="bedding"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>衣類</Text>
                 <SuppliesGenre
                     genre="clothing"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>生活用水</Text>
                 <SuppliesGenre
                     genre="domestic_water"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>薬</Text>
                 <SuppliesGenre
                     genre="medicine"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>衛生用品</Text>
                 <SuppliesGenre
                     genre="hygiene_supplies"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
 
                 <Text style={styles.genre}>その他</Text>
                 <SuppliesGenre
                     genre="other"
-                    suppliess={suppliess}
+                    suppliess={supplies}
                 />
             </ScrollView>
         </View>

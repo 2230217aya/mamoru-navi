@@ -1,5 +1,6 @@
 import { StyleSheet, Pressable, Text, View, } from "react-native";
 import { Href, useRouter  } from 'expo-router';
+import { blue } from "react-native-reanimated/lib/typescript/Colors";
 
 type Props = {
     name?: string;  // 名前
@@ -14,7 +15,7 @@ export default function suppliesStatus({
         <Pressable style={styles.array}>
             <Text style={styles.name}>{name}</Text>
             <Text  style={styles.item}>
-                {count}
+                <Text style={styles.count}>{count}</Text>
                 {unit}
             </Text>
         </Pressable>
@@ -28,12 +29,15 @@ const styles = StyleSheet.create({
     },
 
     name: {
-        fontSize: 15,
+        fontSize: 18,
         textAlign: "left",
     },
     item: {
-        fontSize: 15,
+        fontSize: 18,
         textAlign: "right",
         flexDirection: "row",
+    },
+    count: {
+        color: "#0004FF",
     },
 })

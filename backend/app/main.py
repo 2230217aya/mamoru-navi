@@ -18,7 +18,7 @@ from typing import List, Optional
 # --- ルーターのインポート（すべて集約） ---
 from routers import (
     users, scan, checkins, notifications, 
-    reservations, danger_area, congestion, facilities
+    reservations, danger_area, congestion, facilities, supplies
 )
 
 
@@ -655,3 +655,6 @@ def get_offline_map_data():
                 for s in shelters
             ]
             return {"count": len(shelter_list), "shelters": shelter_list}
+
+# ===== SUPPLIES =====
+app.include_router(supplies.router)
