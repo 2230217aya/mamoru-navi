@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import UserLists from '../components/userList-component';
 
 // テスト用のID
-const TEST_SHELTER_ID = "123e4567-e89b-12d3-a456-426614174000";
+const TEST_SHELTER_ID = "11111111-1111-1111-1111-111111111111";
 
 // apiのurl
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -73,17 +73,19 @@ export default function userList({ SHELTER_ID_GET }: Props) {
   useEffect(() => {
     // 避難所データ
     const fetchSData = async () => {
-      // 避難所などの情報取得
-      const response = await fetch(SHELTER_API_URL);
-      if (!response.ok) {throw new Error("shelter fetch failed");}
-      let ShelterData = await response.json();
+      try {
+        // 避難所などの情報取得
+        const response = await fetch(SHELTER_API_URL);
+        if (!response.ok) {throw new Error("shelter fetch failed");}
+        let ShelterData = await response.json();
 
-      console.log(ShelterData);   // 確認用
+        // バックから送られたデータの名前がuseStateと違っていたら名前変換
+        ShelterData = convertShelterData(ShelterData);
 
-      // バックから送られたデータの名前がuseStateと違っていたら名前変換
-      ShelterData = convertShelterData(ShelterData);
-
-      setShelterData(ShelterData);
+        setShelterData(ShelterData);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     // 避難所の中の人データ
@@ -142,8 +144,11 @@ export default function userList({ SHELTER_ID_GET }: Props) {
         </View>
 
         {/* 右上のアイコン */}
-        <Pressable onPress={() => router.push("/supplies-status")} style={styles.cardboardImageButton}>
-            <Image source={require('@/assets/images/hinan.png')} style={styles.cardboardImage} />
+        <Pressable onPress={() => router.push({
+          pathname:"/supplies-status",
+          params: {SHELTER_ID: SHELTER_ID},
+        })} style={styles.cardboardImageButton}>
+            <Image source={require('@/assets/images/userList-cardboard.png')} style={styles.cardboardImage} />
         </Pressable>
       </View>
 
@@ -237,8 +242,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   cardboardImage: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
+    resizeMode: "contain",
   },
 
   // 上の名前 性別とかのやつ

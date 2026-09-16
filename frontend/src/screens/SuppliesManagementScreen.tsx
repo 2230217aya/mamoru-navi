@@ -3,14 +3,16 @@ import { Stack, router  } from 'expo-router';
 import { useState, useEffect } from 'react';
 import SuppliesModal from '../components/suppliesManagement-modal-component';
 import SuppliesInput from '../components/suppliesManagement-input-component';
-
-// apiのurl
-const API_BASE_URL = "";
-// 使用するapiのurl
-// /の後に付け足す
-const SUPPLIES_API_URL = `${API_BASE_URL}/`;
+import { useLocalSearchParams } from "expo-router";
 
 export default function suppliesManagement() {
+    // ユーザー一覧画面から送られた避難所のIDを取得
+    const { SHELTER_ID } = useLocalSearchParams<{SHELTER_ID: string;}>();
+
+    // apiのurl
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+    const SUPPLIES_API_URL = `${API_BASE_URL}/supplies/${SHELTER_ID}`;
+
     // 入れる・取り出すを切り替える
     const [mode, setMode] = useState<"insert" | "remove">("insert");
     // 選択値
@@ -19,7 +21,8 @@ export default function suppliesManagement() {
     const [outname, setOutNmae] = useState("");   // 物資名（取り出し用）
     // 入力値
     const [name, setName] = useState("");           // 物資名
-    const [deadline, setDeadline] = useState("");   // 有効期限
+    const [deadline, setDeadline] = useState("");           // 有効期限(入れる用)
+    const [outExpiration, setOutExpiration] = useState(""); // 有効期限(取り出す用)
     const [count, setCount] = useState("");         // 数量
     // モーダルの値
     // 品目
@@ -60,22 +63,39 @@ export default function suppliesManagement() {
     // バックから送られたデータの名前が違っていたら入力し直す
     // .testの部分をバックの型名に変更
     const convertSuppliesData = (suppliesData: any) => {
-        return suppliesData.map((supplies: any) => ({
-        genre: supplies.test,
-        name: supplies.test,
-        expiration: supplies.test,
-        quantity: supplies.test,
-        unit: supplies.test,
+        return suppliesData.map((supply: any) => ({
+        genre: supply.genre,
+        name: supply.name,
+        expiration: supply.expiration,
+        quantity: supply.quantity,
+        unit: supply.unit,
         }));
     };
 
-    const outOptions = supplies
-        .filter((item) => {
-            return item.genre === value;
-        })
-        .map((item) => ({
-            label: item.name,
-            value: item.name,
+    // 物資一覧
+    const outOptions = [
+        ...new Set(
+            supplies
+                .filter(item => item.genre === value)
+                .map(item => item.name)
+        )
+    ].map(name => ({
+        label: name,
+        value: name,
+    }));
+    // 期限一覧
+    const expirationOptions = [
+        ...new Set(
+            supplies
+                .filter(item =>
+                    item.genre === value &&
+                    item.name === outname
+                )
+                .map(item => item.expiration)
+        ),
+    ].map(exp => ({
+        label: exp || "期限なし",
+        value: exp,
     }));
 
     // 品目変更時に物資名をリセット
@@ -86,18 +106,19 @@ export default function suppliesManagement() {
     // 画面表示時に実行
     useEffect(() => {
         const fetchIData = async () => {
-            // 物資状況の情報取得(テスト用)
-            const testSupplies: Supplies[] = [
-                {genre: "food", name: "アルファ化米", expiration: "", quantity: 250, unit: "食"},
-                {genre: "food", name: "缶詰", expiration: "", quantity: 55, unit: "缶"},
-                {genre: "bedding", name: "パーテーション", expiration: "", quantity: 400, unit: "枚"},
-            ];
-            setSupplies(testSupplies);
+            try {
+                // 物資の情報取得
+                const response = await fetch(SUPPLIES_API_URL);
+                if (!response.ok) {throw new Error("supplies fetch failed");}
+                let suppliesData: Supplies[] = await response.json();
 
-            // // 物資の情報取得
-            // const response = await fetch(SUPPLIES_API_URL);
-            // const suppliesData: Supplies[] = await response.json();
-            // setSupplies(suppliesData);
+                // バックから送られたデータの名前がuseStateと違っていたら名前変換
+                suppliesData = convertSuppliesData(suppliesData);
+
+                setSupplies(suppliesData);
+            } catch (error) {
+                console.error(error);
+            }
         };
         fetchIData();
     },[]);
@@ -109,7 +130,54 @@ export default function suppliesManagement() {
         setOutNmae("");
         setName("");
         setDeadline("");
+        setOutExpiration("");
         setCount("");
+    };
+
+    // 物資の一覧取得
+    const fetchSupplies = async () => {
+        try {
+            const response = await fetch(SUPPLIES_API_URL);
+
+            if (!response.ok) {throw new Error("supplies fetch failed");}
+
+            let data = await response.json();
+            data = convertSuppliesData(data);
+
+            setSupplies(data);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    // 物資の追加処理
+    const updateSupply = async (quantity: number, expiration: string | null) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/supplies/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    shelter_id: SHELTER_ID,
+                    genre: value,
+                    name: name || outname,
+                    quantity: quantity,
+                    unit: unit,
+                    expiration: expiration,
+                }),
+            });
+
+            if (!response.ok) {throw new Error("supply update failed");}
+
+            // 最新情報取得
+            await fetchSupplies();
+
+            resetForm();
+
+        } catch(error) {
+            console.error(error);
+        }
     };
 
     useEffect(() => {
@@ -203,42 +271,10 @@ export default function suppliesManagement() {
                         style={styles.submitButton}
                         onPress={() => {
                             console.log("入れる：送信");
-
-                            const quantity = Number(count);
-                            setSupplies(prev => {
-                                // 既に同じ物資が存在するか
-                                const existing = prev.find(
-                                    item =>
-                                        item.genre === value &&
-                                        item.name === name
-                                );
-
-                                // あれば数量加算
-                                if (existing) {
-                                    return prev.map(item =>
-                                        item.genre === value &&
-                                        item.name === name
-                                            ? {
-                                                ...item,
-                                                quantity:
-                                                    item.quantity + quantity
-                                            }
-                                            : item
-                                    );
-                                }
-                                // なければ新規追加
-                                return [
-                                    ...prev,
-                                    {
-                                        genre: value,
-                                        name: name,
-                                        expiration: deadline,
-                                        quantity: quantity,
-                                        unit: unit,
-                                    }
-                                ];
-                            });
-                            resetForm();    // 入力後にフォームをリセット
+                            updateSupply(
+                                Number(count),
+                                deadline || null
+                            );
                         }}
                     >
                         <Text style={styles.submitText}>送信</Text>
@@ -265,6 +301,14 @@ export default function suppliesManagement() {
                         setValue={setOutNmae}
                     />
 
+                    {/* 有効期限 */}
+                    <SuppliesModal
+                        categoryName="有効期限"
+                        options={expirationOptions}
+                        value={outExpiration}
+                        setValue={setOutExpiration}
+                    />
+
                     {/* 数量 */}
                     <SuppliesInput
                         inputName="数量"
@@ -278,42 +322,10 @@ export default function suppliesManagement() {
                         style={styles.submitButtonOut}
                         onPress={() => {
                             console.log("取り出す：送信");
-
-                            const quantity = Number(count);
-
-                            const selectedSupply = supplies.find(
-                                item =>
-                                    item.genre === value &&
-                                    item.name === outname
+                            updateSupply(
+                                -Number(count),
+                                outExpiration || null
                             );
-
-                            // 在庫チェック
-                            if (!selectedSupply) {
-                                alert("物資が見つかりません");
-                                return;
-                            }
-
-                            if (selectedSupply.quantity < quantity) {
-                                alert("在庫が不足しています");
-                                return;
-                            }
-
-                            // 数量を減らす
-                            setSupplies(prev =>
-                                prev
-                                    .map(item =>
-                                        item.genre === value &&
-                                        item.name === outname
-                                            ? {
-                                                ...item,
-                                                quantity:
-                                                    item.quantity - quantity,
-                                            }
-                                            : item
-                                    )
-                                    .filter(item => item.quantity > 0)
-                            );
-                            resetForm();    // 入力後にフォームをリセット
                         }}
                     >
                         <Text style={styles.submitTextOut}>送信</Text>
